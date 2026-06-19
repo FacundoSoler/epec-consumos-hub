@@ -47,9 +47,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         const averageConsumption = (totalConsumption / cantidadConsumos).toFixed(2);
+        const projectedConsumption = Math.round((averageConsumption * 28));
         
         document.getElementById('totalConsumption').innerHTML = `<b>${Math.round(totalConsumption)} </b> kWh`;
         document.getElementById('averageConsumption').innerHTML = `<b>${ Math.round(averageConsumption) } </b> kWh`;
-        document.getElementById('projectedConsumption').innerHTML = `<b>${Math.round((averageConsumption * 28))} </b> kWh`;
+        document.getElementById('projectedConsumption').innerHTML = `<b>${projectedConsumption} </b> kWh`;
     }
 });
