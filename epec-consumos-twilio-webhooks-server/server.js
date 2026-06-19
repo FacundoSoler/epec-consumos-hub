@@ -25,10 +25,9 @@ const TEST_TWILIO = true;
 const twilioClient = require('twilio')(TWILIO_SID, TWILIO_TOKEN);
 const { MessagingResponse } = require('twilio').twiml;
 
-let globalEpecReport = "No data available yet.";
-
 const getToDate = () => {
-    const now = new Date();
+    // Force the date to Argentina time (UTC-3)
+    const now = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Argentina/Cordoba" }));
     const pad = (n) => String(n).padStart(2, '0');
     return `${pad(now.getDate())}${pad(now.getMonth() + 1)}${now.getFullYear()}${pad(now.getHours())}${pad(now.getMinutes())}`;
 };
@@ -90,6 +89,34 @@ async function getEpecData(desde, hasta) {
     }
 }
 
+function getConsumptionMetrics(data) {
+    let finalTotal = 0;
+    data.forEach(element => {
+        finalTotal += parseFloat(element.consumo) || 0;
+    });
+
+    let finalAvg = finalTotal / data.length;
+    let finalProjected = Math.round(finalAvg * 28);
+    finalTotal = Math.round(finalTotal);
+    finalAvg = Math.round(finalAvg);
+
+    let detalleConsumo = '';
+    for (let i = 0; i < data.length; i++) {
+        detalleConsumo = detalleConsumo + `${data[i].fechaHora}: ${Math.round(data[i].consumo)} kWh \n`;
+    }
+
+    return { detalleConsumo, finalTotal, finalAvg, finalProjected };
+}
+
+function getFullEPECReport(detalleConsumo, finalTotal, finalAvg, finalProjected) {
+    const globalEpecReport = `📊 *Reporte EPEC Consumo Completo*\n\n` +
+        `${detalleConsumo} \n` +
+        `• Total consumo acumulado: ${finalTotal} kWh\n` +
+        `• Promedio consumo diario: ${finalAvg} kWh\n` +
+        `• Consumo mensual proyectado (28 días): ${finalProjected} kWh`;
+    return globalEpecReport;
+}
+
 app.get('/api/getEpecConsumptionData', async (req, res) => {
     // 1. Extract params, but don't force them
     const { desde, hasta } = req.query;
@@ -124,28 +151,9 @@ app.post('/api/epecReportCronJob', async (req, res) => {
             return res.status(404).json({ error: "No EPEC data available for the requested date range." });
         }
 
-        let finalTotal = 0;
-        data.forEach(element => {
-            finalTotal += parseFloat(element.consumo) || 0;
-        });
-
-        let finalAvg = finalTotal / data.length;
-        let finalProjected = Math.round(finalAvg * 28);
-        finalTotal = Math.round(finalTotal);
-        finalAvg = Math.round(finalAvg);
-
-        let detalle = '';
-        for (let i = 0; i < data.length; i++) {
-            detalle = detalle + `${data[i].fechaHora}: ${Math.round(data[i].consumo)} kWh \n`;
-        }
+        const { detalleConsumo, finalTotal, finalAvg, finalProjected } = getConsumptionMetrics(data);
 
         const lastConsumption = data.at(-1);
-
-        globalEpecReport = `📊 *Reporte EPEC Consumo Completo*\n\n` +
-            `${detalle} \n` +
-            `• Total consumo acumulado: ${finalTotal} kWh\n` +
-            `• Promedio consumo diario: ${finalAvg} kWh\n` +
-            `• Consumo mensual proyectado (28 días): ${finalProjected} kWh`;
 
         console.log("📥 Fresh EPEC data received from Chrome Extension.");
 
@@ -164,7 +172,7 @@ app.post('/api/epecReportCronJob', async (req, res) => {
 });
 
 // --- ENDPOINT 2: HANDLE INCOMING REPLIES FROM WHATSAPP (from initial Appointment twilio initiator) ---
-app.post('/api/webhook', (req, res) => {
+app.post('/api/webhook', async (req, res) => {
     try {
         const incomingText = req.body.Body ? req.body.Body.trim().toLowerCase() : "";
         const sender = req.body.From;
@@ -175,13 +183,28 @@ app.post('/api/webhook', (req, res) => {
 
         // 3. Serve the cached data for free now that the window is open
         if (incomingText === 'ok' || incomingText === 'ready') {
-            twiml.message(globalEpecReport);
+            const data = await getEpecData(FIXED_START_DATE, getToDate());
+
+            if (!data || data.length === 0) {
+                console.warn("⚠️ EPEC returned an empty dataset.");
+                twiml.message("Lo siento, no pude obtener los datos de consumo en este momento.");
+            } else {
+                const { detalleConsumo, finalTotal, finalAvg, finalProjected } = getConsumptionMetrics(data);
+                const globalEpecReport = getFullEPECReport(detalleConsumo, finalTotal, finalAvg, finalProjected);
+                twiml.message(globalEpecReport);
+            }
+
             console.log(`🚀 Pushed custom report to ${sender}`);
+        } else {
+            twiml.message("Por favor escribe 'ok' para recibir tu reporte.");
         }
 
         res.type('text/xml').send(twiml.toString());
     } catch (error) {
         console.error('error receiving Twilio whatsapp reply from user', error.message);
+        const twiml = new MessagingResponse();
+        twiml.message("⚠️ Hubo un error técnico. Por favor intenta más tarde.");
+        res.type('text/xml').send(twiml.toString());
     }
 });
 
