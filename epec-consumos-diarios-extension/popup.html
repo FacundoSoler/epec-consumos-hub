@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+
+<body style="width: 300px; padding: 10px; font-family: sans-serif;">
+    <h2>EPEC Consumos</h2>
+    <button id="refreshBtn">Refrescar Data</button>
+    <div id="status" style="font-size: 14px; color: gray; margin-top:5px"></div>
+    <ul id="results">
+    </ul>
+
+    <table style="width: 100%;">
+        <tbody>
+            <tr>
+                <td>
+                    <div>Total consumo acumulado: </div>
+                </td>
+                <style></style>
+                <td style="text-align: right;">
+                    <div id="totalConsumption"></div>
+                </td>
+            </tr>
+
+            <tr>
+                <td>
+                    <div>Promedio consumo diario: </div>
+                </td>
+                <td style="text-align: right;">
+                    <div id="averageConsumption"></div>
+                </td>
+            </tr>
+
+            <tr>
+                <td>
+                    <div>Consumo mensual proyectado (28 dias): </div>
+                </td>
+                <td style="text-align: right;">
+                    <div id="projectedConsumption"></div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <script src="popup.js"></script>
+</body>
+
+</html>
