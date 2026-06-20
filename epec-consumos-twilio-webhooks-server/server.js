@@ -208,7 +208,7 @@ app.post('/api/webhook', async (req, res) => {
     }
 });
 
-app.get('/api/test', (req, res) => {
+app.post('/api/test', (req, res) => {
     return res.status(200).json({ response: "success !" });
 });
 
