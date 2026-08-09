@@ -4,16 +4,30 @@
     "version": "1.0",
     "permissions": [
         "storage",
-        "alarms"
+        "tabs"
     ],
     "host_permissions": [
         "https://www.epec.com.ar/*",
         "http://localhost:3000/*"
     ],
     "background": {
-        "service_worker": "background.js"
+        "service_worker": "background.js",
+        "type": "module"
     },
     "action": {
         "default_popup": "popup.html"
-    }
+    },
+    "content_scripts": [
+        {
+            "matches": ["https://www.epec.com.ar/*"],
+            "js": ["content-main.js"],
+            "world": "MAIN",
+            "run_at": "document_start"
+        },
+        {
+            "matches": ["https://www.epec.com.ar/*"],
+            "js": ["content-isolated.js"],
+            "run_at": "document_start"
+        }
+    ]
 }
