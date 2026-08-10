@@ -1,5 +1,5 @@
 {
-  "name": "epec-consumos-twilio-webhooks-server",
+  "name": "epec-consumos-webhooks-server",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
