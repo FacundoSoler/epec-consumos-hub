@@ -1,5 +1,5 @@
 import { pool } from './db.js';
-import { encrypt } from './encryption';
+import { encrypt } from './encryption.js';
 
 export async function deleteUserAndCleanupContracts(documento: number, emailAddress: string, sub: number) {
     const client = await pool.connect();

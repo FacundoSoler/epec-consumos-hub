@@ -1,5 +1,5 @@
-import { consumptionDetails } from "../models/consumptionDetails";
-import { RawEpecConsumptionItem } from "../models/rawEpecConsumptionItem";
+import { consumptionDetails } from "../models/consumptionDetails.js";
+import { RawEpecConsumptionItem } from "../models/rawEpecConsumptionItem.js";
 
 const EPEC_API_KEY = process.env.EPEC_API_KEY;
 const EPEC_API_BASE_URL = process.env.EPEC_API_BASE_URL;

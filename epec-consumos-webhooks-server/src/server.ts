@@ -1,9 +1,10 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 
-import authRoutes from './routes/authRoutes.ts';
-import epecApiRoutes from './routes/epecAPIroutes.ts';
-import webhooksRoutes from './routes/webhooksRoutes.ts';
+import authRoutes from './routes/authRoutes.js';
+import epecApiRoutes from './routes/epecAPIroutes.js';
+import webhooksRoutes from './routes/webhooksRoutes.js';
 
 const app = express();
 app.use(cors());

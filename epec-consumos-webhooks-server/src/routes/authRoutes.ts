@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { handleLogOff, handleSyncUser, handleTestAPI } from '../controllers/authController';
+import { handleLogOff, handleSyncUser, handleTestAPI } from '../controllers/authController.js';
 
 const router = Router();
 

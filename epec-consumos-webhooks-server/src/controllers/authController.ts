@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { processUserLogOff, syncUser } from '../services/authService';
+import { processUserLogOff, syncUser } from '../services/authService.js';
 
 export const handleLogOff = async (req: Request, res: Response) => {
     const { token } = req.body;

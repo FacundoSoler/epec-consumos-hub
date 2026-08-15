@@ -1,9 +1,9 @@
-import { decrypt } from '../db/encryption';
-import { consumptionDetails } from "../models/consumptionDetails";
-import { getToDate } from "../utils/utils";
-import { getContractCurrentPeriod, getEpecData } from "./epecAPIservice";
-import { sendEmail } from './emailService';
-import { getNotificationsPreferences } from '../db/repository'
+import { decrypt } from '../db/encryption.js';
+import { consumptionDetails } from "../models/consumptionDetails.js";
+import { getToDate } from "../utils/utils.js";
+import { getContractCurrentPeriod, getEpecData } from "./epecAPIservice.js";
+import { sendEmail } from './emailService.js';
+import { getNotificationsPreferences } from '../db/repository.js'
 
 export const processNotifications = async () => {
     try {

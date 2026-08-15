@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
-import { getContractCurrentPeriod, getEpecData, getContratos, contratos } from '../services/epecAPIservice';
-import { getToDate } from '../utils/utils';
+import { getContractCurrentPeriod, getEpecData, getContratos, contratos } from '../services/epecAPIservice.js';
+import { getToDate } from '../utils/utils.js';
 
 export const handleGetContratos = async (req: Request, res: Response) => {
     try {

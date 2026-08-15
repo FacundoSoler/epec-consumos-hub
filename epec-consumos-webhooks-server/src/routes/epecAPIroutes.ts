@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { handleGetContractCurrentPeriod, handleContratos, handleGetContratos, handleGetEpecData, handleGetEpecConsumptionData } from '../controllers/epecAPIcontroller';
+import { handleGetContractCurrentPeriod, handleContratos, handleGetContratos, handleGetEpecData, handleGetEpecConsumptionData } from '../controllers/epecAPIcontroller.js';
 
 const router = Router();
 

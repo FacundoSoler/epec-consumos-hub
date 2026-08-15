@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { epecReportCronJob } from '../controllers/webhooksController';
+import { epecReportCronJob } from '../controllers/webhooksController.js';
 
 const router = Router();
 

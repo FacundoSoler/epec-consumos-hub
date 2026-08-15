@@ -1,5 +1,5 @@
 import {Request, Response} from 'express';
-import { processNotifications } from '../services/webhooksService';
+import { processNotifications } from '../services/webhooksService.js';
 
 const CRON_JOB_API_KEY = process.env.CRON_JOB_API_KEY;
 

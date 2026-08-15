@@ -1,5 +1,5 @@
-import { getUserTokenDetails } from "../utils/utils";
-import { deleteUserAndCleanupContracts, syncUserContext } from '../db/repository'
+import { getUserTokenDetails } from "../utils/utils.js";
+import { deleteUserAndCleanupContracts, syncUserContext } from '../db/repository.js'
 
 const EPEC_API_KEY = process.env.EPEC_API_KEY;
 const EPEC_API_BASE_URL = process.env.EPEC_API_BASE_URL;
