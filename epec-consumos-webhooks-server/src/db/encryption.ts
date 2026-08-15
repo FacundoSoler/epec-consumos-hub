@@ -1,10 +1,11 @@
+import 'dotenv/config';
 import crypto from 'crypto';
 
 const ALGORITHM = 'aes-256-gcm';
-const ENCRYPTION_KEY = Buffer.from(process.env.DB_ENCRYPTION_KEY, 'hex'); // 32-byte key
+const ENCRYPTION_KEY = Buffer.from(process.env.DB_ENCRYPTION_KEY || '', 'hex');
 const IV_LENGTH = 12;
 
-export function encrypt(text) {
+export function encrypt(text: string) {
     const iv = crypto.randomBytes(IV_LENGTH);
     const cipher = crypto.createCipheriv(ALGORITHM, ENCRYPTION_KEY, iv);
     
@@ -17,7 +18,7 @@ export function encrypt(text) {
     return `${iv.toString('hex')}:${authTag}:${encrypted}`;
 }
 
-export function decrypt(encryptedData) {
+export function decrypt(encryptedData: string) {
     const [ivHex, authTagHex, encryptedText] = encryptedData.split(':');
     
     const iv = Buffer.from(ivHex, 'hex');

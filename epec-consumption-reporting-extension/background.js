@@ -121,7 +121,7 @@ async function handleSaveNotifications(preferencesPayload) {
             notificationsPreferences: preferencesPayload
         };
 
-        const response = await fetch(`${API_BASE_URL}/sync-user`, {
+        const response = await fetch(`${API_BASE_URL}/auth/sync-user`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(apiPayload)
@@ -165,7 +165,7 @@ async function getContractCurrentPeriod() {
     const contractId = await store.getContractId();
     const bearerToken = await store.getBearerToken();
 
-    const url = `${API_BASE_URL}/getContractCurrentPeriod?contractId=${contractId}`;
+    const url = `${API_BASE_URL}/epec/getContractCurrentPeriod?contractId=${contractId}`;
     const response = await fetch(url, {
         headers: {
             bearertoken: bearerToken
@@ -201,7 +201,7 @@ async function fetchData() {
         const bearerToken = await store.getBearerToken();
         const currentContractPeriod = await getContractCurrentPeriod();
 
-        const url = `${API_BASE_URL}/getEpecConsumptionData?desde=${currentContractPeriod.desde}&hasta=${hasta}&contractId=${contractId}`;
+        const url = `${API_BASE_URL}/epec/getEpecConsumptionData?desde=${currentContractPeriod.desde}&hasta=${hasta}&contractId=${contractId}`;
         const response = await fetch(url, {
             headers: {
                 bearertoken: bearerToken
@@ -247,7 +247,7 @@ async function fetchData() {
 
 async function fetchContracts(bearertoken) {
     try {
-        const url = `${API_BASE_URL}/contratos`;
+        const url = `${API_BASE_URL}/epec/contratos`;
 
         const response = await fetch(url, {
             headers: {

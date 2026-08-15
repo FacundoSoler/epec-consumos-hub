@@ -11,7 +11,7 @@ export const pool = new Pool({
     connectionString,
 });
 
-export const query = async (text, params) => {
+export const query = async (text:any, params:any) => {
     const start = Date.now();
     try {
         const res = await pool.query(text, params);
