@@ -155,7 +155,7 @@ Both projects use Vitest: 53 server tests and 108 extension tests. `npm test` at
 - **Expired EPEC token:** reports fail with 401 until the user visits epec.com.ar again. The extension logs it and retries on the next refresh.
 - **Alerts:** `/sendEmailAlert` exists, but the extension does not compute threshold alerts yet (the alert UI is hidden in the popup).
 - **One contract per user:** only `contratos[0]` is used.
-- **`IS_PRODUCTION` flag** in `background.js` is switched by hand; a build step would allow a build-time env and separate dev/prod manifests (dropping `localhost:3000` from production `host_permissions`).
+- **`IS_PRODUCTION` flag** in `background.js` is `true` (Railway) in the repo and switched to `false` by hand for local development; a build step would allow a build-time env and separate dev/prod manifests (dropping `localhost:3000` from production `host_permissions`).
 - **Old database:** the Railway Postgres from the previous design may still hold encrypted tokens and emails of users who opted in. Purge it or drop the database. This is a manual step outside the code.
 - **Rate limiter:** single instance only (see above).
 

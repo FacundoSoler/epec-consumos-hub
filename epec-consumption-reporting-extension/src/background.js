@@ -5,7 +5,7 @@ import { getContratos, getContractCurrentPeriod, getEpecData } from './services/
 import { getToDate } from './utils/utils.js';
 import { sendDailyReportIfDue } from './services/dailyReportService.js';
 
-const IS_PRODUCTION = false; // Switch to false when debugging locally
+const IS_PRODUCTION = true; // Set to false to use a local server (npm run dev on localhost:3000)
 
 const API_BASE_URL = IS_PRODUCTION
     ? 'https://epec-consumos-hub-production.up.railway.app/api'

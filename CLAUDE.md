@@ -37,7 +37,7 @@ Extension (`epec-consumption-reporting-extension/`):
 - EPEC returns `consumo` as `"12,4"`; `getEpecData` normalises to numbers and sorts newest first, so `[0]` is the latest day.
 - Dates use `America/Argentina/Cordoba`. Weekdays are `"0".."6"` strings with Sunday = `"0"`. EPEC's `hasta` is `DDMMYYYYHHmm`.
 - `content-main.js` runs in epec.com.ar's own JS context: any `fetch`/XHR patch must hand the original response back, or the site breaks.
-- `IS_PRODUCTION` in `src/background.js` is a manual switch and stays `false` (localhost) in the repo.
+- `IS_PRODUCTION` in `src/background.js` is a manual switch, `true` (Railway) in the repo. Set it to `false` locally to hit `npm run dev`, and do not commit that change.
 
 ## Conventions
 
