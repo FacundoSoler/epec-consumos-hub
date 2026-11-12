@@ -80,3 +80,98 @@ describe('background service worker', () => {
         expect(response).toEqual({ success: false });
     });
 });
+
+describe('background message router', () => {
+    it('registers exactly one onMessage listener', async () => {
+        mockEpecApi();
+        const mock = await loadBackground();
+
+        expect(mock.messageListeners).toHaveLength(1);
+    });
+
+    it('ignores unknown messages and does not keep the channel open', async () => {
+        mockEpecApi();
+        const mock = await loadBackground();
+        const sendResponse = vi.fn();
+
+        const keepOpen = mock.messageListeners[0]({ action: 'nope' }, {}, sendResponse);
+
+        expect(keepOpen).toBe(false);
+        expect(sendResponse).not.toHaveBeenCalled();
+    });
+
+    it('save_notifications stores preferences and answers exactly once', async () => {
+        mockEpecApi();
+        const mock = await loadBackground({ epecUser: storedUser });
+        const sendResponse = vi.fn();
+        const preferences = { email_reports: { enabled: true, days: ['1'] } };
+
+        mock.messageListeners[0]({ action: 'save_notifications', payload: preferences }, {}, sendResponse);
+
+        await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        expect(sendResponse).toHaveBeenCalledTimes(1);
+        expect(sendResponse).toHaveBeenCalledWith({ success: true });
+        expect(mock.storage.notificationPrefs).toEqual(preferences);
+    });
+
+    it('save_notifications without a stored user answers with an error', async () => {
+        mockEpecApi();
+        const mock = await loadBackground();
+
+        const response = await mock.dispatch({ action: 'save_notifications', payload: {} });
+
+        expect(response.success).toBe(false);
+        expect(response.error).toMatch(/No User data found/);
+    });
+
+    it('logOff clears local storage', async () => {
+        mockEpecApi();
+        const mock = await loadBackground({ epecUser: storedUser, consumptionData: [] });
+
+        const response = await mock.dispatch({ action: 'logOff' });
+
+        expect(response).toEqual({ success: true });
+        expect(mock.storage).toEqual({});
+    });
+
+    it('logOff without a session fails and keeps storage untouched', async () => {
+        mockEpecApi();
+        const mock = await loadBackground({ lastUpdated: 'x' });
+
+        const response = await mock.dispatch({ action: 'logOff' });
+
+        expect(response.success).toBe(false);
+        expect(mock.storage).toEqual({ lastUpdated: 'x' });
+    });
+
+    it('LOGIN_EPEC_SESSION now answers through sendResponse', async () => {
+        mockEpecApi();
+        const mock = await loadBackground();
+
+        const response = await mock.dispatch({ type: 'LOGIN_EPEC_SESSION', payload: loginPayload });
+
+        expect(response).toEqual({ success: true });
+    });
+});
+
+describe('refresh edge cases', () => {
+    it('refreshData reports failure when EPEC returns no readings', async () => {
+        mockEpecApi({ readings: [] });
+        const mock = await loadBackground({ epecUser: storedUser });
+
+        const response = await mock.dispatch({ action: 'refreshData' });
+
+        expect(response).toEqual({ success: false });
+        expect(mock.storage.consumptionData).toBeUndefined();
+    });
+
+    it('refreshData reports failure instead of throwing when no user is stored (router)', async () => {
+        mockEpecApi();
+        const mock = await loadBackground();
+
+        const response = await mock.dispatch({ action: 'refreshData' });
+
+        expect(response).toEqual({ success: false });
+    });
+});
