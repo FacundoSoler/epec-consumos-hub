@@ -21,6 +21,7 @@ const messageHandlers = {
     refreshData: async () => ({ success: await fetchData() }),
     logOff: logOff,
     save_notifications: (request) => saveNotificationPreferences(request.payload),
+    selectContract: (request) => selectContract(request.payload),
     LOGIN_EPEC_SESSION: (request) => loginEpecSession(request.payload)
 };
 
@@ -80,6 +81,20 @@ async function saveNotificationPreferences(preferences) {
 
     await chrome.storage.local.set({ [localStorageKeys.NOTIFICATION_PREFERENCES]: preferences });
     return { success: true };
+}
+
+async function selectContract(contractId) {
+    const epecUser = await store.getEpecUser();
+    const isUserContract = epecUser.contratos?.some((contract) => String(contract.id) === String(contractId));
+    if (!isUserContract) throw new Error('The selected contract does not belong to the EPEC user.');
+
+    // Emptying the stored readings keeps the previous contract's data from showing, and from
+    // being compared with the new contract's readings to flag the update badge.
+    await chrome.storage.local.set({
+        [localStorageKeys.SELECTED_CONTRACT_ID]: contractId,
+        [localStorageKeys.CONSUMPTION_DATA]: []
+    });
+    return { success: await fetchData() };
 }
 
 async function fetchData() {

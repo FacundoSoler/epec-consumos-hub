@@ -7,15 +7,24 @@ export const sampleReadings = [
 
 const jsonResponse = (body, status = 200) => ({ ok: status < 400, status, json: async () => body });
 
-/** Routes fetch calls by URL to canned EPEC (and optional server) responses. */
+const readingsFor = (url, readingsByContract) => {
+    const contractId = url.match(/\/contratos\/([^/]+)\//)?.[1];
+    return readingsByContract[contractId];
+};
+
+/**
+ * Routes fetch calls by URL to canned EPEC (and optional server) responses.
+ * `readingsByContract` overrides `readings` for the contract ids it lists.
+ */
 export function mockEpecApi({
     contracts = [{ id: 'C1' }],
     period = { desde: '01112026' },
     readings = sampleReadings,
+    readingsByContract = {},
     serverStatus = 200
 } = {}) {
     const fetchMock = vi.fn(async (url) => {
-        if (url.includes('CONSUMO_DIARIO')) return jsonResponse(readings);
+        if (url.includes('CONSUMO_DIARIO')) return jsonResponse(readingsFor(url, readingsByContract) ?? readings);
         if (url.includes('/consumos/tipo-medicion')) return jsonResponse(period);
         if (url.includes('/usuarios/contratos')) return jsonResponse(contracts);
         return jsonResponse({}, serverStatus);

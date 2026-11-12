@@ -1,6 +1,6 @@
 import { localStorageKeys } from './storage/localStorageKeys.js';
 import { summarizeConsumption, toKwh } from './utils/consumptionMetrics.js';
-import { store } from './storage/store.js';
+import { resolveSelectedContract, store } from './storage/store.js';
 import { showSessionExpiredBadge } from './services/sessionService.js';
 import { validateAlertThreshold } from './services/alertService.js';
 
@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const userdisplay = document.getElementById('user-display');
     const routeBtn = document.getElementById('route-login');
     const routeLogOff = document.getElementById('route-logoff');
+    const contractSelect = document.getElementById('contract-select');
 
     const toggleEmail = document.getElementById('toggle-email');
     const panelEmail = document.getElementById('panel-email');
@@ -154,13 +155,29 @@ document.addEventListener('DOMContentLoaded', () => {
     const resultsList = document.getElementById('results');
     const status = document.getElementById('status'); // clear the current badge icon if any was set.
 
-    chrome.storage.local.get([localStorageKeys.EPEC_USER], (result) => {
-        if (result.epecUser && result.epecUser.nombre) {
+    chrome.storage.local.get([localStorageKeys.EPEC_USER, localStorageKeys.SELECTED_CONTRACT_ID], (result) => {
+        const epecUser = result[localStorageKeys.EPEC_USER];
+        if (epecUser && epecUser.nombre) {
             enableLoggedInPanel(true);
 
-            const contractId = result.epecUser.contratos[0]?.id ?? '';
-            userdisplay.textContent = `${result.epecUser.nombre} ${result.epecUser.apellido} - Contrato: ${contractId}`;
+            const contract = resolveSelectedContract(epecUser.contratos, result[localStorageKeys.SELECTED_CONTRACT_ID]);
+            userdisplay.textContent = `${epecUser.nombre} ${epecUser.apellido} - Contrato: ${contract?.id ?? ''}`;
+            renderContractPicker(epecUser.contratos ?? [], contract);
         }
+    });
+
+    contractSelect.addEventListener('change', () => {
+        status.innerText = "Actualizando contrato...";
+
+        chrome.runtime.sendMessage({ action: 'selectContract', payload: contractSelect.value }, (response) => {
+            if (chrome.runtime.lastError || !response || !response.success) {
+                console.error('Contract change failed:', chrome.runtime.lastError?.message ?? response?.error);
+                status.innerText = "No se pudo cambiar de contrato. Intente nuevamente en unos instantes.";
+                return;
+            }
+
+            location.reload();
+        });
     });
 
     store.isSessionExpired().then((expired) => {
@@ -215,6 +232,19 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('totalConsumption').innerHTML = `<b>${Math.round(total)} </b> kWh`;
         document.getElementById('averageConsumption').innerHTML = `<b>${Math.round(average)} </b> kWh`;
         document.getElementById('projectedConsumption').innerHTML = `<b>${Math.round(projected)} </b> kWh`;
+    }
+
+    function renderContractPicker(contracts, selectedContract) {
+        if (contracts.length < 2) return;
+
+        contracts.forEach((contract) => {
+            const option = document.createElement('option');
+            option.value = String(contract.id);
+            option.textContent = typeof contract.direccion === 'string' ? `${contract.id} - ${contract.direccion}` : String(contract.id);
+            option.selected = contract === selectedContract;
+            contractSelect.appendChild(option);
+        });
+        document.getElementById('contract-picker').classList.remove('hidden');
     }
 
     function setEmailReportsDaysOfTheWeek() {

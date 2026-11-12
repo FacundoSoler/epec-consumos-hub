@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createChromeMock } from './helpers/chromeMock.js';
-import { store } from '../src/storage/store.js';
+import { resolveSelectedContract, store } from '../src/storage/store.js';
 
 function withStorage(initialStorage) {
     const mock = createChromeMock(initialStorage);
@@ -33,6 +33,28 @@ describe('store', () => {
         withStorage({ epecUser: { contratos: [{ id: 'C1' }, { id: 'C2' }] } });
 
         await expect(store.getContractId()).resolves.toBe('C1');
+    });
+
+    it('getContractId returns the selected contract id', async () => {
+        withStorage({ epecUser: { contratos: [{ id: 'C1' }, { id: 'C2' }] }, selectedContractId: 'C2' });
+
+        await expect(store.getContractId()).resolves.toBe('C2');
+    });
+
+    it('getContractId matches a numeric EPEC id against the stored string selection', async () => {
+        withStorage({ epecUser: { contratos: [{ id: 1 }, { id: 2 }] }, selectedContractId: '2' });
+
+        await expect(store.getContractId()).resolves.toBe(2);
+    });
+
+    it('getContractId falls back to the first contract when the selection is gone', async () => {
+        withStorage({ epecUser: { contratos: [{ id: 'C1' }, { id: 'C2' }] }, selectedContractId: 'OLD' });
+
+        await expect(store.getContractId()).resolves.toBe('C1');
+    });
+
+    it('resolveSelectedContract handles a missing contract list', () => {
+        expect(resolveSelectedContract(null, 'C1')).toBeUndefined();
     });
 
     it.each([
