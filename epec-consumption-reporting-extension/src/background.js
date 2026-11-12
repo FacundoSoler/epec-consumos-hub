@@ -4,6 +4,7 @@ import { store } from './storage/store.js';
 import { getContratos, getContractCurrentPeriod, getEpecData } from './services/epecAPIservice.js';
 import { getToDate } from './utils/utils.js';
 import { sendDailyReportIfDue } from './services/dailyReportService.js';
+import { sendThresholdAlertIfDue } from './services/alertService.js';
 import { createLogger } from './utils/logger.js';
 import { clearSessionExpired, markSessionExpiredIfRejected } from './services/sessionService.js';
 
@@ -103,6 +104,8 @@ async function fetchData() {
 
         await sendDailyReportIfDue(API_BASE_URL)
             .catch((error) => emailLog.error('Daily report not sent', describeError(error)));
+        await sendThresholdAlertIfDue(API_BASE_URL)
+            .catch((error) => emailLog.error('Threshold alert not sent', describeError(error)));
 
         return true;
     } catch (err) {

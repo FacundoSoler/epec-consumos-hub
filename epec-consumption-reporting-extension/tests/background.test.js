@@ -188,3 +188,16 @@ describe('refresh edge cases', () => {
         expect(response).toEqual({ success: false });
     });
 });
+
+describe('threshold alert trigger', () => {
+    it('asks the server for an alert after a refresh that exceeds the limit', async () => {
+        const fetchMock = mockEpecApi();
+        const prefs = { email_alerts: { enabled: true, threshold: { kwh_limit_per_day: 5, rolling_days_window: 2 } } };
+        const mock = await loadBackground({ epecUser: storedUser, notificationPrefs: prefs });
+
+        await mock.dispatch({ action: 'refreshData' });
+
+        expect(fetchMock.mock.calls.some(([url]) => url.endsWith('/email/sendEmailAlert'))).toBe(true);
+        expect(mock.storage.lastAlertSentOn).toBeDefined();
+    });
+});

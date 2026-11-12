@@ -2,6 +2,7 @@ import { localStorageKeys } from '../storage/localStorageKeys.js';
 import { store } from '../storage/store.js';
 import { getCordobaDateKey, getCordobaWeekday } from '../utils/utils.js';
 import { summarizeConsumption, toKwh } from '../utils/consumptionMetrics.js';
+import { escapeHtml } from '../utils/html.js';
 
 /**
  * Sends today's consumption report through the server if the user enabled it for
@@ -61,8 +62,4 @@ export function buildDailyReportHtml(userName, consumptionData) {
         + `<p>Total acumulado: <b>${Math.round(total)} kWh</b><br>`
         + `Promedio diario: <b>${Math.round(average)} kWh</b><br>`
         + `Consumo mensual proyectado (28 días): <b>${Math.round(projected)} kWh</b></p>`;
-}
-
-function escapeHtml(text) {
-    return String(text ?? '').replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
 }
