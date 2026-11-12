@@ -1,7 +1,7 @@
 /// <reference types="chrome" />
 import { localStorageKeys } from './storage/localStorageKeys.js';
 import { store } from './storage/store.js';
-import { getContratos, getContractCurrentPeriod } from './services/epecAPIservice.js'
+import { getContratos, getContractCurrentPeriod, getEpecData } from './services/epecAPIservice.js'
 import { getToDate } from './utils/utils.js'
 
 const IS_PRODUCTION = false; // Switch to false when debugging locally
@@ -72,13 +72,13 @@ chrome.runtime.onMessage.addListener((message) => {
             };
 
             const contracts = await getContratos(normalizedSession.token);
-            if (contracts && contracts.data.length > 0) {
-                normalizedSession.contratos = contracts.data;
+            if (Array.isArray(contracts) && contracts.length > 0) {
+                normalizedSession.contratos = contracts;
             }
 
-            chrome.storage.local.set({ [localStorageKeys.EPEC_USER]: normalizedSession }, () => {
-                console.log('EPEC identity profile successfully synchronized.');
-            });
+            // Awaited so fetchData() below reads the freshly stored session.
+            await chrome.storage.local.set({ [localStorageKeys.EPEC_USER]: normalizedSession });
+            console.log('EPEC identity profile successfully synchronized.');
 
             await fetchData();
         })();
@@ -118,55 +118,14 @@ async function handleSaveNotifications(preferencesPayload) {
     }
 }
 
-async function getContractCurrentPeriod() {
-    const contractId = await store.getContractId();
-    const bearerToken = await store.getBearerToken();
-
-    const url = `${API_BASE_URL}/epec/getContractCurrentPeriod?contractId=${contractId}`;
-    const response = await fetch(url, {
-        headers: {
-            bearertoken: bearerToken
-        }
-    });
-
-    if (!response.ok) throw new Error(`Error fetching Contract Current Period. Error details: ${response.status} ${response.statusText}`);
-
-    const result = await response.json();
-    if (!result || !result.data || result.data.length <= 0) throw new Error('Error fetching Contract Current Period.');
-
-    const x = result.data;
-    const sanitizedResults = {
-        tipoMedicion: x.tipoMedicion,
-        numeroMedidor: x.numeroMedidor,
-        desde: x.desde,
-        hasta: x.hasta,
-        nombreMedidor: x.nombreMedidor,
-        medicionInteligente: x.medicionInteligente,
-        msjPeriodoMensual: x.msjPeriodoMensual,
-        msjPeriodoDiario: x.msjPeriodoDiario
-    };
-
-    return sanitizedResults;
-}
-
 async function fetchData() {
     const now = new Date();
 
     try {
-        const hasta = getToDate();
         const contractId = await store.getContractId();
         const bearerToken = await store.getBearerToken();
-        const currentContractPeriod = await getContractCurrentPeriod();
-
-        const url = `${API_BASE_URL}/epec/getEpecConsumptionData?desde=${currentContractPeriod.desde}&hasta=${hasta}&contractId=${contractId}`;
-        const response = await fetch(url, {
-            headers: {
-                bearertoken: bearerToken
-            }
-        });
-
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const data = await response.json();
+        const currentContractPeriod = await getContractCurrentPeriod(bearerToken, contractId);
+        const data = await getEpecData(contractId, bearerToken, currentContractPeriod.desde, getToDate());
         console.log("EPEC Data Results " + new Date().toLocaleString(), data);
 
         if (!data || data.length === 0) {
