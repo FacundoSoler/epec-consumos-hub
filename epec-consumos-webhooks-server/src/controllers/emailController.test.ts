@@ -6,10 +6,11 @@ vi.mock('../services/emailService.js', () => ({ sendEmail }));
 
 import { handleSendEmail } from './emailController.js';
 
-const validBody = { subject: 'Reporte', htmlContent: '<p>hola</p>', sendToEmailAddress: 'ana@example.com' };
+const verifiedUser = { email: 'ana@example.com', documento: '30111222' };
+const validBody = { subject: 'Reporte', htmlContent: '<p>hola</p>' };
 
 async function send(body: unknown) {
-    const res = fakeResponse();
+    const res = fakeResponse({ epecUser: verifiedUser });
     await handleSendEmail(fakeRequest({ body }), res);
     return res;
 }
@@ -20,7 +21,7 @@ beforeEach(() => {
 });
 
 describe('handleSendEmail', () => {
-    it('sends the email and answers 200', async () => {
+    it('sends to the verified token email and answers 200', async () => {
         sendEmail.mockResolvedValue('id');
 
         const res = await send(validBody);
@@ -30,13 +31,20 @@ describe('handleSendEmail', () => {
         expect(res.body).toEqual({ status: 'sent' });
     });
 
+    it('ignores a recipient in the body, so callers can only email themselves', async () => {
+        sendEmail.mockResolvedValue('id');
+
+        await send({ ...validBody, sendToEmailAddress: 'victim@example.com', to: 'victim@example.com' });
+
+        expect(sendEmail).toHaveBeenCalledWith('Reporte', '<p>hola</p>', 'ana@example.com');
+    });
+
     it.each([
         ['missing subject', { ...validBody, subject: undefined }, 'subject is required.'],
         ['blank subject', { ...validBody, subject: '   ' }, 'subject is required.'],
         ['non-string subject', { ...validBody, subject: 42 }, 'subject is required.'],
         ['missing htmlContent', { ...validBody, htmlContent: undefined }, 'htmlContent is required.'],
-        ['blank htmlContent', { ...validBody, htmlContent: '' }, 'htmlContent is required.'],
-        ['missing recipient', { ...validBody, sendToEmailAddress: undefined }, 'sendToEmailAddress is required.']
+        ['blank htmlContent', { ...validBody, htmlContent: '' }, 'htmlContent is required.']
     ])('answers 400 for %s without sending', async (_label, body, error) => {
         const res = await send(body);
 
