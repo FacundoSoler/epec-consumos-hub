@@ -122,7 +122,9 @@ async function flagNewReadings(freshData) {
     }
 }
 
-// EPEC failures were already logged with the hashed user by epecFetch; this adds which flow failed.
+// EPEC failures were already logged by epecFetch; this adds which flow failed.
+// Logging any error's message is safe: EPEC messages carry only the query-free path, and our
+// own and our server's messages never echo emails or tokens.
 function describeError(error) {
     return { error: error?.message, kind: error?.kind, status: error?.status };
 }

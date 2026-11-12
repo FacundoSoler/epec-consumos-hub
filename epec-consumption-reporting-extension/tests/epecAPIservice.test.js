@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EpecApiError, classifyEpecFailure, getContratos, getContractCurrentPeriod, getEpecData } from '../src/services/epecAPIservice.js';
-import { hashUser } from '../src/utils/logger.js';
 
 function mockFetchJson(body, { ok = true, status = 200 } = {}) {
     const fetchMock = vi.fn().mockResolvedValue({ ok, status, json: async () => body });
@@ -68,7 +67,7 @@ describe('epecFetch classified errors', () => {
         [403, 'session-expired'],
         [502, 'epec-unavailable'],
         [404, 'request-error']
-    ])('throws an EpecApiError for status %s with kind %s and logs it with the hashed user', async (status, kind) => {
+    ])('throws an EpecApiError for status %s with kind %s and logs it without any user field', async (status, kind) => {
         const errorLog = captureErrorLogs();
         mockFetchJson({}, { ok: false, status });
 
@@ -77,7 +76,8 @@ describe('epecFetch classified errors', () => {
         expect(error).toBeInstanceOf(EpecApiError);
         expect(error).toMatchObject({ kind, status, path: '/usuarios/contratos' });
         const raw = errorLog.mock.calls[0][0];
-        expect(JSON.parse(raw)).toMatchObject({ level: 'error', area: 'epec', kind, status, path: '/usuarios/contratos', user: await hashUser(30111222) });
+        expect(JSON.parse(raw)).toMatchObject({ level: 'error', area: 'epec', kind, status, path: '/usuarios/contratos' });
+        expect(JSON.parse(raw)).not.toHaveProperty('user');
         expect(raw).not.toContain('30111222');
         expect(raw).not.toContain('ana@example.com');
         expect(raw).not.toContain(userToken);
@@ -91,18 +91,20 @@ describe('epecFetch classified errors', () => {
         const error = await getContratos(userToken).catch((e) => e);
 
         expect(error).toMatchObject({ name: 'EpecApiError', kind: 'epec-unavailable', status: undefined, cause: networkError });
-        expect(JSON.parse(errorLog.mock.calls[0][0])).toMatchObject({ kind: 'epec-unavailable', cause: 'Failed to fetch', user: await hashUser(30111222) });
+        expect(JSON.parse(errorLog.mock.calls[0][0])).toMatchObject({ kind: 'epec-unavailable', cause: 'Failed to fetch' });
+        expect(JSON.parse(errorLog.mock.calls[0][0])).not.toHaveProperty('user');
     });
 
-    it('logs the path without its query string and omits the user for an unreadable token', async () => {
+    it('keeps the query string out of the logged path and the error message', async () => {
         const errorLog = captureErrorLogs();
         mockFetchJson({}, { ok: false, status: 500 });
 
-        await getEpecData('C-1', 'opaque-token', '01112026', '121120262359').catch(() => {});
+        const error = await getEpecData('C-1', 'opaque-token', '01112026', '121120262359').catch((e) => e);
 
         const entry = JSON.parse(errorLog.mock.calls[0][0]);
         expect(entry.path).toBe('/usuarios/contratos/C-1/consumos/con-telemedicion/MED_INTELIGENTE/CONSUMO_DIARIO');
-        expect(entry.user).toBeUndefined();
+        expect(error.message).not.toContain('?');
+        expect(error.path).not.toContain('?');
     });
 });
 

@@ -1,5 +1,5 @@
 import { EPEC_API_BASE_URL, EPEC_API_KEY } from '../constants.js';
-import { createLogger, documentoFromToken, hashUser } from '../utils/logger.js';
+import { createLogger } from '../utils/logger.js';
 
 const log = createLogger('epec');
 
@@ -39,6 +39,7 @@ export function classifyEpecFailure(status) {
  */
 
 async function epecFetch(path, bearerToken) {
+    const pathForLogs = stripQuery(path);
     let response;
     try {
         response = await fetch(`${EPEC_API_BASE_URL}${path}`, {
@@ -48,24 +49,23 @@ async function epecFetch(path, bearerToken) {
             }
         });
     } catch (cause) {
-        throw await logAndBuildEpecError(`EPEC API ${path} could not be reached`, { path, bearerToken, cause });
+        throw logAndBuildEpecError(`EPEC API ${pathForLogs} could not be reached`, { path: pathForLogs, cause });
     }
 
     if (!response.ok) {
-        throw await logAndBuildEpecError(`EPEC API ${path} responded with status ${response.status}`, { path, bearerToken, status: response.status });
+        throw logAndBuildEpecError(`EPEC API ${pathForLogs} responded with status ${response.status}`, { path: pathForLogs, status: response.status });
     }
 
     return response.json();
 }
 
-async function logAndBuildEpecError(message, { path, bearerToken, status, cause }) {
-    const error = new EpecApiError(message, { kind: classifyEpecFailure(status), status, path: stripQuery(path), cause });
+function logAndBuildEpecError(message, { path, status, cause }) {
+    const error = new EpecApiError(message, { kind: classifyEpecFailure(status), status, path, cause });
     log.error('EPEC request failed', {
         kind: error.kind,
         status,
         path: error.path,
-        cause: cause instanceof Error ? cause.message : undefined,
-        user: await hashUser(documentoFromToken(bearerToken))
+        cause: cause instanceof Error ? cause.message : undefined
     });
     return error;
 }
