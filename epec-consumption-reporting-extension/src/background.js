@@ -11,11 +11,8 @@ import { clearSessionExpired, markSessionExpiredIfRejected } from './services/se
 const log = createLogger('background');
 const emailLog = createLogger('email');
 
-const IS_PRODUCTION = true; // Set to false to use a local server (npm run dev on localhost:3000)
-
-const API_BASE_URL = IS_PRODUCTION
-    ? 'https://epec-consumos-hub-production.up.railway.app/api'
-    : 'http://localhost:3000/api';
+// Injected at build time (build/build.js) and by vitest.config.js.
+const API_BASE_URL = __API_BASE_URL__;
 
 const messageHandlers = {
     refreshData: async () => ({ success: await fetchData() }),

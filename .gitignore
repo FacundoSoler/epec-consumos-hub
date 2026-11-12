@@ -1,3 +1,4 @@
 /epec-consumos-webhooks-server/node_modules
 epec-consumos-webhooks-server/.env
 /epec-consumption-reporting-extension/node_modules
+/epec-consumption-reporting-extension/dist
