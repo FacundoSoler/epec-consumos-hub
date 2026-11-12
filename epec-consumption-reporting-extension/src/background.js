@@ -2,7 +2,7 @@
 import { localStorageKeys } from './storage/localStorageKeys.js';
 import { store } from './storage/store.js';
 import { getContratos, getContractCurrentPeriod } from './services/epecAPIservice.js'
-import { getToDate } from '../src/utils/utils.js'
+import { getToDate } from './utils/utils.js'
 
 const IS_PRODUCTION = false; // Switch to false when debugging locally
 
