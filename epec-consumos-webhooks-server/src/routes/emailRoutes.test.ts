@@ -23,10 +23,11 @@ describe('email routes', () => {
         ]);
     });
 
-    it('checks the EPEC token before the controller on every route', () => {
+    it('runs token check, then the daily limiter, then the controller on every route', () => {
         for (const route of registeredRoutes()) {
+            expect(route.handlers).toHaveLength(3);
             expect(route.handlers[0]).toBe(requireEpecToken);
-            expect(route.handlers.at(-1)).toBe(handleSendEmail);
+            expect(route.handlers[2]).toBe(handleSendEmail);
         }
     });
 });
