@@ -4,6 +4,10 @@ import { store } from './storage/store.js';
 import { getContratos, getContractCurrentPeriod, getEpecData } from './services/epecAPIservice.js';
 import { getToDate } from './utils/utils.js';
 import { sendDailyReportIfDue } from './services/dailyReportService.js';
+import { createLogger } from './utils/logger.js';
+
+const log = createLogger('background');
+const emailLog = createLogger('email');
 
 const IS_PRODUCTION = true; // Set to false to use a local server (npm run dev on localhost:3000)
 
@@ -26,7 +30,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     handler(request)
         .then(sendResponse)
         .catch((error) => {
-            console.error(`Error handling "${request.action ?? request.type}":`, error);
+            log.error('Message handler failed', { handler: request.action ?? request.type, ...describeError(error) });
             sendResponse({ success: false, error: error.message });
         });
 
@@ -83,7 +87,7 @@ async function fetchData() {
         const data = await getEpecData(contractId, bearerToken, currentContractPeriod.desde, getToDate());
 
         if (data.length === 0) {
-            console.error('No consumption data found to calculate.');
+            log.warn('No consumption data found to calculate.');
             return false;
         }
 
@@ -94,11 +98,11 @@ async function fetchData() {
         });
 
         await sendDailyReportIfDue(API_BASE_URL)
-            .catch((error) => console.error('Daily report not sent:', error));
+            .catch((error) => emailLog.error('Daily report not sent', describeError(error)));
 
         return true;
     } catch (err) {
-        console.error(new Date().toLocaleString(), 'Fetch failed:', err);
+        log.error('Fetch failed', describeError(err));
         return false;
     }
 }
@@ -116,4 +120,9 @@ async function flagNewReadings(freshData) {
         chrome.action.setBadgeText({ text: '!' });
         chrome.action.setBadgeBackgroundColor({ color: '#FF0000' });
     }
+}
+
+// EPEC failures were already logged with the hashed user by epecFetch; this adds which flow failed.
+function describeError(error) {
+    return { error: error?.message, kind: error?.kind, status: error?.status };
 }
