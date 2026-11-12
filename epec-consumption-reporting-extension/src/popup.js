@@ -122,6 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (thresholdError) {
             saveStatus.textContent = thresholdError;
             saveStatus.style.color = 'red';
+            setTimeout(() => { saveStatus.textContent = ''; }, 5000);
             return;
         }
 
