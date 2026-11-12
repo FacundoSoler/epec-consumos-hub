@@ -4,6 +4,9 @@ import cors from 'cors';
 
 import emailRoutes from './routes/emailRoutes.js';
 import { getPort } from './config.js';
+import { getLogHashSecret } from './logger.js';
+
+getLogHashSecret();
 
 const app = express();
 app.use(cors());

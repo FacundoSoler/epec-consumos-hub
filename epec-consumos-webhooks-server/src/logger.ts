@@ -1,4 +1,8 @@
-import { createHash } from 'node:crypto';
+import { createHmac } from 'node:crypto';
+
+// Only for local development and tests; production refuses to start without a real secret.
+const DEV_LOG_HASH_SECRET = 'dev-only-log-hash-secret';
+let warnedAboutDevSecret = false;
 
 export type LogLevel = 'info' | 'warn' | 'error';
 export type LogFields = Record<string, string | number | boolean | undefined>;
@@ -28,7 +32,25 @@ export function createLogger(area: string): Logger {
     };
 }
 
-/** Truncated SHA-256: enough to correlate one user's log lines, not enough to recover the DNI. */
+/**
+ * Keyed so the ~10^8 possible DNIs cannot be brute-forced back from a log line
+ * without the secret. Truncated to 12 hex chars for readability.
+ */
 export function hashUser(documento: string | number): string {
-    return createHash('sha256').update(String(documento)).digest('hex').slice(0, 12);
+    return createHmac('sha256', getLogHashSecret()).update(String(documento)).digest('hex').slice(0, 12);
+}
+
+/** Called at startup so a missing Railway variable fails the deploy instead of the first EPEC error. */
+export function getLogHashSecret(): string {
+    const secret = process.env.LOG_HASH_SECRET;
+    if (secret) return secret;
+
+    if (process.env.NODE_ENV === 'production') {
+        throw new Error('LOG_HASH_SECRET must be set in production.');
+    }
+    if (!warnedAboutDevSecret) {
+        warnedAboutDevSecret = true;
+        createLogger('config').warn('LOG_HASH_SECRET is not set; using a dev-only default.');
+    }
+    return DEV_LOG_HASH_SECRET;
 }
