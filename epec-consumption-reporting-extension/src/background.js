@@ -94,12 +94,13 @@ async function fetchData() {
     }
 }
 
+// Readings are sorted newest first (see getEpecData), so index 0 is the latest day.
 async function flagNewReadings(freshData) {
     const { [localStorageKeys.CONSUMPTION_DATA]: storedData } = await chrome.storage.local.get([localStorageKeys.CONSUMPTION_DATA]);
     if (!Array.isArray(storedData) || storedData.length === 0) return;
 
-    const latestFresh = freshData.at(-1);
-    const latestStored = storedData.at(-1);
+    const latestFresh = freshData[0];
+    const latestStored = storedData[0];
     const hasNewData = latestFresh.fechaHora !== latestStored.fechaHora || latestFresh.consumo !== latestStored.consumo;
 
     if (hasNewData) {
