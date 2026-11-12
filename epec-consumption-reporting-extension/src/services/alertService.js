@@ -3,6 +3,9 @@ import { store } from '../storage/store.js';
 import { getCordobaDateKey } from '../utils/utils.js';
 import { toKwh } from '../utils/consumptionMetrics.js';
 import { escapeHtml } from '../utils/html.js';
+import { createLogger } from '../utils/logger.js';
+
+const log = createLogger('alerts');
 
 /**
  * @typedef {Object} AlertThreshold
@@ -58,7 +61,12 @@ export async function sendThresholdAlertIfDue(apiBaseUrl) {
 
     // The server would reject the expired token anyway; skipping avoids a pointless failing call.
     if (stored[localStorageKeys.SESSION_EXPIRED] === true) return;
-    if (!alertPrefs?.enabled || !isValidThreshold(alertPrefs.threshold)) return;
+    if (!alertPrefs?.enabled) return;
+    if (!isValidThreshold(alertPrefs.threshold)) {
+        // Only reachable with preferences saved before validation existed; the values themselves stay out of logs.
+        log.warn('Stored alert threshold is invalid; alerts skipped until it is saved again');
+        return;
+    }
     if (stored[localStorageKeys.LAST_ALERT_SENT_ON] === today) return;
     if (!Array.isArray(consumptionData)) return;
 

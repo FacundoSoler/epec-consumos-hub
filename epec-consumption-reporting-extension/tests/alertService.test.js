@@ -117,6 +117,29 @@ describe('sendThresholdAlertIfDue', () => {
         expect(fetchMock).not.toHaveBeenCalled();
     });
 
+    it('logs one warning without the threshold values when the stored threshold is invalid', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        setup({ prefs: alertPrefs({ kwh_limit_per_day: -7, rolling_days_window: 3 }) });
+
+        await sendThresholdAlertIfDue(API);
+
+        expect(warn).toHaveBeenCalledOnce();
+        const line = JSON.parse(warn.mock.calls[0][0]);
+        expect(line).toMatchObject({ level: 'warn', area: 'alerts' });
+        expect(warn.mock.calls[0][0]).not.toContain('-7');
+        warn.mockRestore();
+    });
+
+    it('does not warn when alerts are simply disabled', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        setup({ prefs: alertPrefs({ kwh_limit_per_day: 0, rolling_days_window: 0 }, false) });
+
+        await sendThresholdAlertIfDue(API);
+
+        expect(warn).not.toHaveBeenCalled();
+        warn.mockRestore();
+    });
+
     it('sends again on a new day', async () => {
         const { fetchMock } = setup({ storage: { lastAlertSentOn: '2026-11-11' } });
 
