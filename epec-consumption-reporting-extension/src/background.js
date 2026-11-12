@@ -82,9 +82,10 @@ async function saveNotificationPreferences(preferences) {
 }
 
 async function fetchData() {
+    let bearerToken;
     try {
         const contractId = await store.getContractId();
-        const bearerToken = await store.getBearerToken();
+        bearerToken = await store.getBearerToken();
         const currentContractPeriod = await getContractCurrentPeriod(bearerToken, contractId);
         const data = await getEpecData(contractId, bearerToken, currentContractPeriod.desde, getToDate());
 
@@ -93,6 +94,7 @@ async function fetchData() {
             return false;
         }
 
+        await clearSessionExpired();
         await flagNewReadings(data);
         await chrome.storage.local.set({
             [localStorageKeys.CONSUMPTION_DATA]: data,
@@ -105,7 +107,7 @@ async function fetchData() {
         return true;
     } catch (err) {
         log.error('Fetch failed', describeError(err));
-        await markSessionExpiredIfRejected(err);
+        await markSessionExpiredIfRejected(err, bearerToken);
         return false;
     }
 }

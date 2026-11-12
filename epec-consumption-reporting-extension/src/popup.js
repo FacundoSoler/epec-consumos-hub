@@ -1,6 +1,7 @@
 import { localStorageKeys } from './storage/localStorageKeys.js';
 import { summarizeConsumption, toKwh } from './utils/consumptionMetrics.js';
 import { store } from './storage/store.js';
+import { showSessionExpiredBadge } from './services/sessionService.js';
 
 const EPEC_LOGIN_URL = 'https://www.epec.com.ar/usuario/ingreso?returnTo=%2Foficina-virtual%2Fmis-datos';
 
@@ -157,6 +158,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     store.isSessionExpired().then((expired) => {
         document.getElementById('session-expired').classList.toggle('hidden', !expired);
+        // Opening the popup clears the badge above, but an expired session still needs the user.
+        if (expired) showSessionExpiredBadge();
     });
 
     chrome.storage.local.get([localStorageKeys.CONSUMPTION_DATA, localStorageKeys.LAST_UPDATED], (result) => {
