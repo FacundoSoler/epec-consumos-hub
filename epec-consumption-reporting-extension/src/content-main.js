@@ -17,36 +17,30 @@ window.fetch = async function (...args) {
     return response;
 };
 
-const OriginalXHR = window.XMLHttpRequest;
+// Patch the prototype rather than replacing the constructor, so XMLHttpRequest.DONE,
+// instanceof checks and anything else the site relies on keep working.
+const originalOpen = XMLHttpRequest.prototype.open;
+const originalSend = XMLHttpRequest.prototype.send;
+const interceptedUrls = new WeakMap();
 
-window.XMLHttpRequest = function() {
-    const xhr = new OriginalXHR();
-    let interceptedUrl = '';
-
-    const originalOpen = xhr.open;
-    xhr.open = function(method, url, ...rest) {
-        interceptedUrl = url;
-        console.log('XHR call intercepted: ' + url);
-        return originalOpen.apply(this, [method, url, ...rest]);
-    };
-
-    const originalSend = xhr.send;
-    xhr.send = function(body) {
-        xhr.addEventListener('load', function() {
-            if (typeof interceptedUrl === 'string' && interceptedUrl.includes('/api/login')) {
-                try {
-                    const data = JSON.parse(xhr.responseText);
-                    
-                    window.postMessage({ type: 'EPEC_NETWORK_LOGIN', data }, '*');
-                    console.log('Successfully extracted login payload via XHR!');
-                } catch (error) {
-                    console.error('Error handling intercepted XHR login stream:', error);
-                }
-            }
-        });
-
-        return originalSend.apply(this, arguments);
-    };
-
-    return xhr;
+XMLHttpRequest.prototype.open = function (method, url, ...rest) {
+    interceptedUrls.set(this, String(url));
+    return originalOpen.call(this, method, url, ...rest);
 };
+
+XMLHttpRequest.prototype.send = function (...args) {
+    if (interceptedUrls.get(this)?.includes('/api/login')) {
+        this.addEventListener('load', () => postLoginPayloadFromXhr(this));
+    }
+
+    return originalSend.apply(this, args);
+};
+
+function postLoginPayloadFromXhr(xhr) {
+    try {
+        const data = JSON.parse(xhr.responseText);
+        window.postMessage({ type: 'EPEC_NETWORK_LOGIN', data }, window.location.origin);
+    } catch (error) {
+        console.error('Error handling intercepted XHR login stream:', error);
+    }
+}
