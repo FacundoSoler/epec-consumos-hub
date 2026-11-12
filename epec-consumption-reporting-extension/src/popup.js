@@ -1,4 +1,5 @@
 import { localStorageKeys } from './storage/localStorageKeys.js';
+import { summarizeConsumption, toKwh } from './utils/consumptionMetrics.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const unauthView = document.getElementById('unauth-view');
@@ -187,24 +188,17 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderLocalData(data) {
         resultsList.innerHTML = "";
 
-        const totalConsumption = data.reduce((accumulator, currentItem) => {
-            return accumulator + parseFloat(currentItem.consumo);
-        }, 0);
-        const cantidadConsumos = data.length;
-
         data.forEach(entry => {
             const li = document.createElement('li');
-            const consumo = entry.consumo.replace(',', '.').trim();
-            li.textContent = (consumo !== '') ? `${entry.fechaHora}: ${Math.round(consumo)} kWh` : `${entry.fechaHora}: `;
+            li.textContent = `${entry.fechaHora}: ${Math.round(toKwh(entry.consumo))} kWh`;
             resultsList.appendChild(li);
         });
 
-        const averageConsumption = (totalConsumption / cantidadConsumos).toFixed(2);
-        const projectedConsumption = Math.round((averageConsumption * 28));
+        const { total, average, projected } = summarizeConsumption(data);
 
-        document.getElementById('totalConsumption').innerHTML = `<b>${Math.round(totalConsumption)} </b> kWh`;
-        document.getElementById('averageConsumption').innerHTML = `<b>${Math.round(averageConsumption)} </b> kWh`;
-        document.getElementById('projectedConsumption').innerHTML = `<b>${projectedConsumption} </b> kWh`;
+        document.getElementById('totalConsumption').innerHTML = `<b>${Math.round(total)} </b> kWh`;
+        document.getElementById('averageConsumption').innerHTML = `<b>${Math.round(average)} </b> kWh`;
+        document.getElementById('projectedConsumption').innerHTML = `<b>${Math.round(projected)} </b> kWh`;
     }
 
     function setEmailReportsDaysOfTheWeek() {
