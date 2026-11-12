@@ -10,6 +10,7 @@ Repo root (runs both sub-projects in sequence; exits 1 if either fails):
 - Install everything: `npm run install:all`
 - All tests: `npm test`
 - Typecheck everything: `npm run check`
+- CI runs `npm test` and `npm run check` on every pull request via `.github/workflows/ci.yml`.
 
 Server (`epec-consumos-webhooks-server/`):
 - Dev server: `npm run dev` (http://localhost:3000)
