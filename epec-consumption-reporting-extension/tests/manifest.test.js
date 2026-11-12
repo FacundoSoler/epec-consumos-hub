@@ -19,6 +19,10 @@ describe('manifest.json', () => {
         expect(manifest.action.default_popup).toBe('src/popup.html');
     });
 
+    it('requests only the storage permission (chrome.tabs.create needs no "tabs")', () => {
+        expect(manifest.permissions).toEqual(['storage']);
+    });
+
     it.each(referencedFiles())('references an existing file: %s', (path) => {
         expect(existsSync(resolve(extensionRoot, path))).toBe(true);
     });

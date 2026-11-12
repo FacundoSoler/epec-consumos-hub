@@ -3,8 +3,7 @@
     "name": "EPEC Consumption Checker",
     "version": "1.0",
     "permissions": [
-        "storage",
-        "tabs"
+        "storage"
     ],
     "host_permissions": [
         "https://www.epec.com.ar/*",
