@@ -1,11 +1,15 @@
+/// <reference types="chrome" />
 import { localStorageKeys } from './storage/localStorageKeys.js';
 import { store } from './storage/store.js';
+import { getContratos, getContractCurrentPeriod } from './services/epecAPIservice.js'
+import { getToDate } from '../src/utils/utils.js'
 
 const IS_PRODUCTION = false; // Switch to false when debugging locally
 
 const API_BASE_URL = IS_PRODUCTION
     ? 'https://epec-consumos-hub-production.up.railway.app/api'
     : 'http://localhost:3000/api';
+
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "refreshData") {
@@ -25,16 +29,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const user = store.getEpecUser()
             .then((user) => {
                 if (!user) throw new Error("No user session found to log off.");
-                return logOff(user.token)
+                return true;
             })
             .then((isSuccess) => {
-                chrome.storage.local.remove([
-                    localStorageKeys.EPEC_USER,
-                    localStorageKeys.CONSUMPTION_DATA,
-                    localStorageKeys.NOTIFICATION_PREFERENCES,
-                    localStorageKeys.LAST_UPDATED,
-                    localStorageKeys.IS_SYNCED_WITH_CLOUD
-                ], () => {
+                chrome.storage.local.clear(() => {
                     sendResponse({ success: isSuccess });
                 });
             }).catch((error) => {
@@ -61,7 +59,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 chrome.runtime.onMessage.addListener((message) => {
-    if (message.type === 'SYNC_EPEC_SESSION') {
+    if (message.type === 'LOGIN_EPEC_SESSION') {
         (async () => {
             const raw = message.payload;
             const normalizedSession = {
@@ -73,7 +71,7 @@ chrome.runtime.onMessage.addListener((message) => {
                 contratos: null
             };
 
-            const contracts = await fetchContracts(normalizedSession.token);
+            const contracts = await getContratos(normalizedSession.token);
             if (contracts && contracts.data.length > 0) {
                 normalizedSession.contratos = contracts.data;
             }
@@ -90,61 +88,26 @@ chrome.runtime.onMessage.addListener((message) => {
 async function handleSaveNotifications(preferencesPayload) {
     try {
         const data = await chrome.storage.local.get([
-            localStorageKeys.EPEC_USER,
-            localStorageKeys.IS_SYNCED_WITH_CLOUD
+            localStorageKeys.EPEC_USER
         ]);
 
         const epecUser = data[localStorageKeys.EPEC_USER] || {};
-        const isSyncedWithCloud = data[localStorageKeys.IS_SYNCED_WITH_CLOUD] === true;
-
         const emailReportsEnabled = preferencesPayload?.email_reports?.enabled === true;
         const emailAlertsEnabled = preferencesPayload?.email_alerts?.enabled === true;
 
-        // Guard clause: Avoid network hit if turning off notifications that were never synced
-        if (!emailReportsEnabled && !emailAlertsEnabled && !isSyncedWithCloud) {
+        if (!epecUser.email) {
+            throw new Error("No EPEC user context found in local storage.");
+        }
+
+        if (!emailReportsEnabled && !emailAlertsEnabled) {
             await chrome.storage.local.set({
                 [localStorageKeys.NOTIFICATION_PREFERENCES]: preferencesPayload
             });
             return { success: true };
         }
 
-        if (!epecUser.email) {
-            throw new Error("No EPEC user context found in local storage.");
-        }
-
-        const apiPayload = {
-            documento: epecUser.documento,
-            emailAddress: epecUser.email,
-            fullName: `${epecUser.nombre || ''} ${epecUser.apellido || ''}`.trim(),
-            token: epecUser.token || '',
-            contratos: epecUser.contratos || [],
-            notificationsPreferences: preferencesPayload
-        };
-
-        const response = await fetch(`${API_BASE_URL}/auth/sync-user`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(apiPayload)
-        });
-
-        if (!response.ok) {
-            let errorMessage = `Backend responded with status: ${response.status}`;
-            try {
-                const errorResult = await response.json();
-                if (errorResult && errorResult.error) {
-                    errorMessage = errorResult.error; // Captures your custom backend message
-                }
-            } catch (jsonParseError) {
-                // Fallback if the backend sent a non-JSON error page (e.g., 500 crash)
-            }
-            throw new Error(errorMessage);
-        }
-
-        const result = await response.json();
-
         await chrome.storage.local.set({
-            [localStorageKeys.NOTIFICATION_PREFERENCES]: preferencesPayload,
-            [localStorageKeys.IS_SYNCED_WITH_CLOUD]: result.synced
+            [localStorageKeys.NOTIFICATION_PREFERENCES]: preferencesPayload
         });
 
         return { success: true };
@@ -154,12 +117,6 @@ async function handleSaveNotifications(preferencesPayload) {
         return { success: false, error: error.message };
     }
 }
-
-const getToDate = () => {
-    const now = new Date();
-    const pad = (n) => String(n).padStart(2, '0');
-    return `${pad(now.getDate())}${pad(now.getMonth() + 1)}${now.getFullYear()}${pad(now.getHours())}${pad(now.getMinutes())}`;
-};
 
 async function getContractCurrentPeriod() {
     const contractId = await store.getContractId();
@@ -245,61 +202,9 @@ async function fetchData() {
     }
 }
 
-async function fetchContracts(bearertoken) {
-    try {
-        const url = `${API_BASE_URL}/epec/contratos`;
-
-        const response = await fetch(url, {
-            headers: {
-                bearertoken: bearertoken
-            }
-        });
-
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const data = await response.json();
-
-        if (!data || data.length === 0) {
-            console.error("No Contratos data found.");
-            return false;
-        }
-
-        return data;
-    } catch (err) {
-        console.error(new Date().toLocaleString(), "Fetch failed:", err);
-    }
-}
-
 async function logOff(token) {
     try {
-        const url = `${API_BASE_URL}/auth/logoff`;
-        const payload = {
-            token: token
-        }
-
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-            let errorMessage = `HTTP error! status: ${response.status}`;
-            try {
-                const errorData = await response.json();
-                if (errorData && errorData.error) errorMessage += ` - ${errorData.error}`;
-            } catch (pErr) {
-
-            }
-            throw new Error(errorMessage);
-        }
-
-        const data = await response.json();
-        if (!data || data.length === 0) {
-            console.error(`Error logging off account. ${response.error}`);
-            return false;
-        }
+        chrome.storage.local.clear();
 
         return true;
     } catch (error) {

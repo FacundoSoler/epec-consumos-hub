@@ -1,4 +1,4 @@
-import { authUserDetails } from "../models/authUserDetails";
+import { authUserDetails } from "../models/authUserDetails.js";
 import jwt, { JwtPayload } from 'jsonwebtoken';
 
 interface CustomJwtPayload {

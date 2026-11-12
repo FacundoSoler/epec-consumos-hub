@@ -26,7 +26,6 @@ window.XMLHttpRequest = function() {
     const xhr = new OriginalXHR();
     let interceptedUrl = '';
 
-    // 1. Intercept the 'open' method to grab the URL
     const originalOpen = xhr.open;
     xhr.open = function(method, url, ...rest) {
         interceptedUrl = url;
@@ -34,14 +33,11 @@ window.XMLHttpRequest = function() {
         return originalOpen.apply(this, [method, url, ...rest]);
     };
 
-    // 2. Intercept the 'send' method to capture the response
     const originalSend = xhr.send;
     xhr.send = function(body) {
-        // Listen for the request to finish
         xhr.addEventListener('load', function() {
             if (typeof interceptedUrl === 'string' && interceptedUrl.includes('/api/login')) {
                 try {
-                    // XHR stores the raw string response in responseText
                     const data = JSON.parse(xhr.responseText);
                     
                     window.postMessage({ type: 'EPEC_NETWORK_LOGIN', data }, '*');
