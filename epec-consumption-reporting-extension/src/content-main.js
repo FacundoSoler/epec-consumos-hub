@@ -2,22 +2,19 @@ const originalFetch = window.fetch;
 
 window.fetch = async function (...args) {
     const response = await originalFetch.apply(this, args);
-    const url = args[0];
+    const url = args[0] instanceof Request ? args[0].url : String(args[0]);
 
-    console.log('API call intercepted: ' + url);
-
-    if (typeof url === 'string' && url.includes('/api/login')) {
+    if (url.includes('/api/login')) {
         try {
-            const clone = response.clone();
-            const data = await clone.json();
-
-            window.postMessage({ type: 'EPEC_NETWORK_LOGIN', data }, '*');
+            const data = await response.clone().json();
+            window.postMessage({ type: 'EPEC_NETWORK_LOGIN', data }, window.location.origin);
         } catch (error) {
             console.error('Error handling intercepted login stream:', error);
         }
-
-        return response;
     }
+
+    // Every call must get its response back, or the EPEC site itself breaks.
+    return response;
 };
 
 const OriginalXHR = window.XMLHttpRequest;
