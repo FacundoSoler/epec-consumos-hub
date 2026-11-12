@@ -1,9 +1,9 @@
-import { Router } from "express";
-import { handleEmailNotification, handleEmailAlert } from '../controllers/emailController.js';
+import { Router } from 'express';
+import { handleSendEmail } from '../controllers/emailController.js';
 
 const router = Router();
 
-router.get('/sendEmailNotification', handleEmailNotification);
-router.get('/sendEmailAlert', handleEmailAlert);
+router.post('/sendEmailNotification', handleSendEmail);
+router.post('/sendEmailAlert', handleSendEmail);
 
 export default router;
