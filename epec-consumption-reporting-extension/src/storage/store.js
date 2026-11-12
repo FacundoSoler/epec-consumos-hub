@@ -1,27 +1,22 @@
-import { localStorageKeys } from "./localStorageKeys.js";
+import { localStorageKeys } from './localStorageKeys.js';
 
 export const store = {
-    async getBearerToken() {
+    async getEpecUser() {
         const data = await chrome.storage.local.get([localStorageKeys.EPEC_USER]);
-        if (!data.epecUser) throw new Error('No User data found.');
+        const epecUser = data[localStorageKeys.EPEC_USER];
+        if (!epecUser) throw new Error('No User data found.');
 
-        return data.epecUser.token;
+        return epecUser;
     },
-    getEpecUser() {
-        return chrome.storage.local.get([localStorageKeys.EPEC_USER])
-            .then((data) => {
-                if (!data.epecUser) throw new Error('No User data found.');
-                return data.epecUser;
-            });
+    async getBearerToken() {
+        const epecUser = await this.getEpecUser();
+        return epecUser.token;
     },
     async getContractId() {
-        const data = await chrome.storage.local.get([localStorageKeys.EPEC_USER]);
-        if (!data.epecUser) throw new Error('EPEC User not found.');
+        const epecUser = await this.getEpecUser();
+        const contractId = epecUser.contratos?.[0]?.id;
+        if (!contractId) throw new Error('Error retrieving contractId.');
 
-        if (data.epecUser.contratos && data.epecUser.contratos.length > 0) {
-            return data.epecUser.contratos[0].id;
-        }
-
-        throw new Error('Error retrieving contractId.');
+        return contractId;
     }
-}
+};
