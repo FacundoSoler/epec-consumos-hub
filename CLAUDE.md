@@ -6,16 +6,19 @@ Chrome extension (`epec-consumption-reporting-extension/`) + stateless Express e
 
 ## Commands
 
+Repo root (runs both sub-projects in sequence; exits 1 if either fails):
+- Install everything: `npm run install:all`
+- All tests: `npm test`
+- Typecheck everything: `npm run check`
+
 Server (`epec-consumos-webhooks-server/`):
 - Dev server: `npm run dev` (http://localhost:3000)
-- All tests: `npm run test:run`
-- One test file: `npx vitest run src/middleware/requireEpecToken.test.ts`
-- Typecheck: `npx tsc --noEmit -p .` (`tsx` does not typecheck, so `npm run dev` can start with type errors)
+- Tests: `npm run test:run`; one file: `npx vitest run src/middleware/requireEpecToken.test.ts`
+- Typecheck: `npm run typecheck` (`tsx` does not typecheck, so `npm run dev` can start with type errors)
 
 Extension (`epec-consumption-reporting-extension/`):
-- All tests: `npm run test:run`
-- One test file: `npx vitest run tests/background.test.js`
-- Parse check: `npm run check`
+- Tests: `npm run test:run`; one file: `npx vitest run tests/background.test.js`
+- Parse check: `npm run typecheck`
 - Load in Chrome: chrome://extensions > Developer mode > Load unpacked > the extension folder
 
 ## Testing

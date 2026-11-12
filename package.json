@@ -1,0 +1,11 @@
+{
+  "name": "epec-consumos-hub",
+  "private": true,
+  "description": "Root scripts that run across both sub-projects. Each sub-project keeps its own dependencies and lockfile.",
+  "type": "module",
+  "scripts": {
+    "install:all": "npm ci --prefix epec-consumos-webhooks-server && npm ci --prefix epec-consumption-reporting-extension",
+    "test": "node scripts/run-in-projects.mjs test:run",
+    "check": "node scripts/run-in-projects.mjs typecheck"
+  }
+}

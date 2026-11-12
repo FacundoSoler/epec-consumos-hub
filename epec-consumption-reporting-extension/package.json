@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "check": "tsc -p .",
+    "typecheck": "tsc -p .",
     "test": "vitest",
     "test:run": "vitest run"
   },
