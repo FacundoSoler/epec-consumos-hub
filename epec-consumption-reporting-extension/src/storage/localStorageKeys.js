@@ -2,5 +2,6 @@ export const localStorageKeys = Object.freeze({
     "EPEC_USER": 'epecUser',
     "CONSUMPTION_DATA": 'consumptionData',
     "LAST_UPDATED": 'lastUpdated',
-    "NOTIFICATION_PREFERENCES": 'notificationPrefs'
+    "NOTIFICATION_PREFERENCES": 'notificationPrefs',
+    "LAST_REPORT_SENT_ON": 'lastReportSentOn'
 });

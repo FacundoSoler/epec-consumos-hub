@@ -155,6 +155,19 @@ describe('background message router', () => {
     });
 });
 
+describe('on-demand trigger', () => {
+    it('refreshes data when Chrome starts', async () => {
+        const fetchMock = mockEpecApi();
+        const mock = await loadBackground({ epecUser: storedUser });
+
+        expect(mock.startupListeners).toHaveLength(1);
+        mock.startupListeners[0]();
+
+        await vi.waitFor(() => expect(mock.storage.consumptionData).toBeDefined());
+        expect(fetchMock.mock.calls.some(([url]) => url.includes('CONSUMO_DIARIO'))).toBe(true);
+    });
+});
+
 describe('refresh edge cases', () => {
     it('refreshData reports failure when EPEC returns no readings', async () => {
         mockEpecApi({ readings: [] });

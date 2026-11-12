@@ -1,5 +1,23 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getToDate } from '../src/utils/utils.js';
+import { getCordobaDateKey, getCordobaWeekday, getToDate } from '../src/utils/utils.js';
+
+describe('getCordobaWeekday / getCordobaDateKey', () => {
+    afterEach(() => vi.useRealTimers());
+
+    it.each([
+        ['2026-11-15T15:00:00Z', '0', '2026-11-15'], // Sunday afternoon
+        ['2026-11-16T02:00:00Z', '0', '2026-11-15'], // Sunday 23:00 Córdoba, Monday in UTC
+        ['2026-11-16T03:00:00Z', '1', '2026-11-16'], // Monday 00:00 Córdoba
+        ['2026-11-21T12:00:00Z', '6', '2026-11-21'], // Saturday
+        ['2027-01-01T02:00:00Z', '4', '2026-12-31']  // New Year's Eve 23:00 Córdoba
+    ])('at %s it is weekday "%s" on %s', (instant, weekday, dateKey) => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date(instant));
+
+        expect(getCordobaWeekday()).toBe(weekday);
+        expect(getCordobaDateKey()).toBe(dateKey);
+    });
+});
 
 afterEach(() => vi.useRealTimers());
 

@@ -3,6 +3,7 @@ import { localStorageKeys } from './storage/localStorageKeys.js';
 import { store } from './storage/store.js';
 import { getContratos, getContractCurrentPeriod, getEpecData } from './services/epecAPIservice.js';
 import { getToDate } from './utils/utils.js';
+import { sendDailyReportIfDue } from './services/dailyReportService.js';
 
 const IS_PRODUCTION = false; // Switch to false when debugging locally
 
@@ -31,6 +32,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     // Keeps the channel open until the async handler calls sendResponse.
     return true;
+});
+
+// Opening Chrome is the on-demand trigger for the daily report.
+chrome.runtime.onStartup.addListener(() => {
+    fetchData();
 });
 
 async function loginEpecSession(rawSession) {
@@ -86,6 +92,9 @@ async function fetchData() {
             [localStorageKeys.CONSUMPTION_DATA]: data,
             [localStorageKeys.LAST_UPDATED]: new Date().toLocaleString()
         });
+
+        await sendDailyReportIfDue(API_BASE_URL)
+            .catch((error) => console.error('Daily report not sent:', error));
 
         return true;
     } catch (err) {
