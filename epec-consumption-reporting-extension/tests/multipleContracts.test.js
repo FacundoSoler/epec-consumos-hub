@@ -58,14 +58,15 @@ describe('contract selection', () => {
         expect(JSON.parse(reportCall[1].body).htmlContent).toContain('<b>40 kWh</b>');
     });
 
-    it('switching contracts does not flag the update badge with the old contract’s readings', async () => {
+    it('a successful switch clears the update badge instead of comparing with the old contract’s readings', async () => {
         mockEpecApi({ readingsByContract });
         const storedC1Readings = [{ fechaHora: '10/11/2026', consumo: 5, dateSorting: 1 }];
         const mock = await loadBackground({ epecUser: storedUser, consumptionData: storedC1Readings });
 
         await mock.dispatch({ action: 'selectContract', payload: 'C2' });
 
-        expect(mock.chrome.action.setBadgeText).not.toHaveBeenCalled();
+        expect(mock.chrome.action.setBadgeText).not.toHaveBeenCalledWith({ text: '!' });
+        expect(mock.chrome.action.setBadgeText).toHaveBeenLastCalledWith({ text: '' });
     });
 
     it('the update badge follows the selected contract', async () => {
@@ -86,5 +87,53 @@ describe('contract selection', () => {
 
         expect(response.success).toBe(false);
         expect(mock.storage.selectedContractId).toBe('C2');
+    });
+
+    it('selects a numeric EPEC contract id sent by the popup as a string', async () => {
+        const fetchMock = mockEpecApi();
+        const numericUser = { ...storedUser, contratos: [{ id: 1001 }, { id: 1002 }] };
+        const mock = await loadBackground({ epecUser: numericUser });
+
+        const response = await mock.dispatch({ action: 'selectContract', payload: '1002' });
+
+        expect(response).toEqual({ success: true });
+        expect(consumptionUrls(fetchMock).every((url) => url.includes('/contratos/1002/'))).toBe(true);
+        expect(String(mock.storage.selectedContractId)).toBe('1002');
+    });
+
+    it('a failed switch keeps the old selection and data and answers success:false', async () => {
+        const fetchMock = mockEpecApi({ readingsByContract });
+        const oldData = [{ fechaHora: '10/11/2026', consumo: 5, dateSorting: 1 }];
+        const mock = await loadBackground({ epecUser: storedUser, selectedContractId: 'C1', consumptionData: oldData, lastUpdated: 'ayer' });
+        fetchMock.mockImplementation(async () => ({ ok: false, status: 500, json: async () => ({}) }));
+
+        const response = await mock.dispatch({ action: 'selectContract', payload: 'C2' });
+
+        expect(response.success).toBe(false);
+        expect(response.error).toMatch(/status 500/);
+        expect(mock.storage.selectedContractId).toBe('C1');
+        expect(mock.storage.consumptionData).toEqual(oldData);
+        expect(mock.storage.lastUpdated).toBe('ayer');
+    });
+
+    it('a switch with no readings for the new contract keeps the old selection', async () => {
+        mockEpecApi({ readingsByContract: { ...readingsByContract, C2: [] } });
+        const mock = await loadBackground({ epecUser: storedUser, selectedContractId: 'C1' });
+
+        const response = await mock.dispatch({ action: 'selectContract', payload: 'C2' });
+
+        expect(response.success).toBe(false);
+        expect(mock.storage.selectedContractId).toBe('C1');
+    });
+
+    it('threshold alerts follow the selected contract', async () => {
+        const fetchMock = mockEpecApi({ readingsByContract });
+        const prefs = { email_alerts: { enabled: true, threshold: { kwh_limit_per_day: 10, rolling_days_window: 1 } } };
+        const mock = await loadBackground({ epecUser: storedUser, notificationPrefs: prefs });
+
+        await mock.dispatch({ action: 'selectContract', payload: 'C2' });
+
+        const alertCall = fetchMock.mock.calls.find(([url]) => url.endsWith('/email/sendEmailAlert'));
+        expect(JSON.parse(alertCall[1].body).htmlContent).toContain('<b>40 kWh por día</b>');
     });
 });

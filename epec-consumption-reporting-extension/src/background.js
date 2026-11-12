@@ -83,18 +83,31 @@ async function saveNotificationPreferences(preferences) {
     return { success: true };
 }
 
-async function selectContract(contractId) {
+// The selection is saved only once the new contract's data loads, so a failed switch leaves
+// the previous contract, its readings and the emails that follow it untouched.
+async function selectContract(requestedContractId) {
     const epecUser = await store.getEpecUser();
-    const isUserContract = epecUser.contratos?.some((contract) => String(contract.id) === String(contractId));
-    if (!isUserContract) throw new Error('The selected contract does not belong to the EPEC user.');
+    const contract = epecUser.contratos?.find((candidate) => String(candidate.id) === String(requestedContractId));
+    if (!contract) throw new Error('The selected contract does not belong to the EPEC user.');
 
-    // Emptying the stored readings keeps the previous contract's data from showing, and from
-    // being compared with the new contract's readings to flag the update badge.
+    const data = await loadContractReadings(contract.id, epecUser.token)
+        .catch(async (error) => {
+            await markSessionExpiredIfRejected(error, epecUser.token);
+            throw error;
+        });
+    if (data.length === 0) throw new Error('No consumption data found for the selected contract.');
+
+    await clearSessionExpired();
     await chrome.storage.local.set({
-        [localStorageKeys.SELECTED_CONTRACT_ID]: contractId,
-        [localStorageKeys.CONSUMPTION_DATA]: []
+        [localStorageKeys.SELECTED_CONTRACT_ID]: contract.id,
+        [localStorageKeys.CONSUMPTION_DATA]: data,
+        [localStorageKeys.LAST_UPDATED]: new Date().toLocaleString()
     });
-    return { success: await fetchData() };
+    // A "new readings" badge described the previous contract.
+    chrome.action.setBadgeText({ text: '' });
+    await sendEmailsIfDue();
+
+    return { success: true };
 }
 
 async function fetchData() {
@@ -102,8 +115,7 @@ async function fetchData() {
     try {
         const contractId = await store.getContractId();
         bearerToken = await store.getBearerToken();
-        const currentContractPeriod = await getContractCurrentPeriod(bearerToken, contractId);
-        const data = await getEpecData(contractId, bearerToken, currentContractPeriod.desde, getToDate());
+        const data = await loadContractReadings(contractId, bearerToken);
 
         if (data.length === 0) {
             log.warn('No consumption data found to calculate.');
@@ -116,11 +128,7 @@ async function fetchData() {
             [localStorageKeys.CONSUMPTION_DATA]: data,
             [localStorageKeys.LAST_UPDATED]: new Date().toLocaleString()
         });
-
-        await sendDailyReportIfDue(API_BASE_URL)
-            .catch((error) => emailLog.error('Daily report not sent', describeError(error)));
-        await sendThresholdAlertIfDue(API_BASE_URL)
-            .catch((error) => emailLog.error('Threshold alert not sent', describeError(error)));
+        await sendEmailsIfDue();
 
         return true;
     } catch (err) {
@@ -128,6 +136,18 @@ async function fetchData() {
         await markSessionExpiredIfRejected(err, bearerToken);
         return false;
     }
+}
+
+async function loadContractReadings(contractId, bearerToken) {
+    const currentContractPeriod = await getContractCurrentPeriod(bearerToken, contractId);
+    return getEpecData(contractId, bearerToken, currentContractPeriod.desde, getToDate());
+}
+
+async function sendEmailsIfDue() {
+    await sendDailyReportIfDue(API_BASE_URL)
+        .catch((error) => emailLog.error('Daily report not sent', describeError(error)));
+    await sendThresholdAlertIfDue(API_BASE_URL)
+        .catch((error) => emailLog.error('Threshold alert not sent', describeError(error)));
 }
 
 // Readings are sorted newest first (see getEpecData), so index 0 is the latest day.

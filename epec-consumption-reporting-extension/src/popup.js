@@ -173,6 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (chrome.runtime.lastError || !response || !response.success) {
                 console.error('Contract change failed:', chrome.runtime.lastError?.message ?? response?.error);
                 status.innerText = "No se pudo cambiar de contrato. Intente nuevamente en unos instantes.";
+                contractSelect.value = contractSelect.dataset.savedValue;
                 return;
             }
 
@@ -244,6 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
             option.selected = contract === selectedContract;
             contractSelect.appendChild(option);
         });
+        contractSelect.dataset.savedValue = contractSelect.value;
         document.getElementById('contract-picker').classList.remove('hidden');
     }
 
