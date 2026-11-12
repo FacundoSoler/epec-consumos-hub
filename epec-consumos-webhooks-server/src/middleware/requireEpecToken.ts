@@ -3,10 +3,9 @@ import jwt from 'jsonwebtoken';
 import { getContratos } from '../services/epecAPIservice.js';
 import { EpecUser } from '../models/epecUser.js';
 import { createLogger, hashUser } from '../logger.js';
+import { classifyEpecFailure } from '../services/epecFailure.js';
 
 const log = createLogger('epec');
-
-export type EpecErrorKind = 'session-expired' | 'epec-unavailable' | 'request-error';
 
 interface EpecJwtPayload {
     email?: string;
@@ -39,13 +38,6 @@ export const requireEpecToken = async (req: Request, res: Response, next: NextFu
     res.locals.epecUser = epecUser;
     return next();
 };
-
-/** Single source of truth for how an EPEC failure is interpreted; a missing status means the network call failed. */
-export function classifyEpecFailure(status?: number): EpecErrorKind {
-    if (status === 401 || status === 403) return 'session-expired';
-    if (status === undefined || status >= 500) return 'epec-unavailable';
-    return 'request-error';
-}
 
 function logEpecFailure(token: string, status?: number, cause?: string) {
     log.error('EPEC token validation failed', {

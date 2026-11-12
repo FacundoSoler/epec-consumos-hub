@@ -5,7 +5,7 @@ import { fakeRequest, fakeResponse } from '../testing/fakeExpress.js';
 const { getContratos } = vi.hoisted(() => ({ getContratos: vi.fn() }));
 vi.mock('../services/epecAPIservice.js', () => ({ getContratos }));
 
-import { classifyEpecFailure, requireEpecToken } from './requireEpecToken.js';
+import { requireEpecToken } from './requireEpecToken.js';
 import { hashUser } from '../logger.js';
 
 // The signing key is irrelevant: authenticity comes from EPEC accepting the token.
@@ -30,21 +30,6 @@ function lastErrorLog() {
     const calls = vi.mocked(console.error).mock.calls;
     return { raw: String(calls.at(-1)?.[0]), entry: JSON.parse(String(calls.at(-1)?.[0])) };
 }
-
-describe('classifyEpecFailure', () => {
-    it.each([
-        [401, 'session-expired'],
-        [403, 'session-expired'],
-        [500, 'epec-unavailable'],
-        [503, 'epec-unavailable'],
-        [undefined, 'epec-unavailable'],
-        [400, 'request-error'],
-        [404, 'request-error'],
-        [429, 'request-error']
-    ] as const)('classifies status %s as %s', (status, kind) => {
-        expect(classifyEpecFailure(status)).toBe(kind);
-    });
-});
 
 describe('requireEpecToken logging', () => {
     it.each([
