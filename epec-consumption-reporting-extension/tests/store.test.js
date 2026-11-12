@@ -52,4 +52,10 @@ describe('store', () => {
 
         expect(mock.chrome.storage.local.get).toHaveBeenCalledTimes(1);
     });
+
+    it.each([[true, true], [false, false], [undefined, false]])('isSessionExpired with stored %s is %s', async (stored, expected) => {
+        withStorage(stored === undefined ? {} : { sessionExpired: stored });
+
+        await expect(store.isSessionExpired()).resolves.toBe(expected);
+    });
 });

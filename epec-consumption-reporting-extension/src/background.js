@@ -5,6 +5,7 @@ import { getContratos, getContractCurrentPeriod, getEpecData } from './services/
 import { getToDate } from './utils/utils.js';
 import { sendDailyReportIfDue } from './services/dailyReportService.js';
 import { createLogger } from './utils/logger.js';
+import { clearSessionExpired, markSessionExpiredIfRejected } from './services/sessionService.js';
 
 const log = createLogger('background');
 const emailLog = createLogger('email');
@@ -60,6 +61,7 @@ async function loginEpecSession(rawSession) {
 
     // Awaited so fetchData() below reads the freshly stored session.
     await chrome.storage.local.set({ [localStorageKeys.EPEC_USER]: normalizedSession });
+    await clearSessionExpired();
     console.log('EPEC identity profile successfully synchronized.');
 
     return { success: await fetchData() };
@@ -103,6 +105,7 @@ async function fetchData() {
         return true;
     } catch (err) {
         log.error('Fetch failed', describeError(err));
+        await markSessionExpiredIfRejected(err);
         return false;
     }
 }

@@ -55,7 +55,8 @@ describe('sendDailyReportIfDue', () => {
         ['today is not a selected day', { prefs: { email_reports: { enabled: true, days: ['1', '3'] } } }],
         ['no days are selected', { prefs: { email_reports: { enabled: true, days: [] } } }],
         ['it was already sent today', { storage: { lastReportSentOn: '2026-11-12' } }],
-        ['there is no consumption data yet', { storage: { consumptionData: [] } }]
+        ['there is no consumption data yet', { storage: { consumptionData: [] } }],
+        ['the EPEC session expired', { storage: { sessionExpired: true } }]
     ])('does nothing when %s', async (_label, options) => {
         const { fetchMock } = setup(options);
 

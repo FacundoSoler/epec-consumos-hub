@@ -3,5 +3,6 @@ export const localStorageKeys = Object.freeze({
     "CONSUMPTION_DATA": 'consumptionData',
     "LAST_UPDATED": 'lastUpdated',
     "NOTIFICATION_PREFERENCES": 'notificationPrefs',
-    "LAST_REPORT_SENT_ON": 'lastReportSentOn'
+    "LAST_REPORT_SENT_ON": 'lastReportSentOn',
+    "SESSION_EXPIRED": 'sessionExpired'
 });

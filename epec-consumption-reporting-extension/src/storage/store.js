@@ -18,5 +18,9 @@ export const store = {
         if (!contractId) throw new Error('Error retrieving contractId.');
 
         return contractId;
+    },
+    async isSessionExpired() {
+        const data = await chrome.storage.local.get([localStorageKeys.SESSION_EXPIRED]);
+        return data[localStorageKeys.SESSION_EXPIRED] === true;
     }
 };

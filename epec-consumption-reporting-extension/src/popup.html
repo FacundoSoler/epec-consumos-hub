@@ -213,6 +213,13 @@
     <div id="auth-view" class="hidden">
         <p style="margin: 0 0 10px 0; font-size: 13px;">Usuario: <strong id="user-display"></strong></p>
 
+        <div id="session-expired" class="hidden"
+            style="background: #fff4e5; border: 1px solid #f0ad4e; border-radius: 4px; padding: 8px; margin-bottom: 10px; font-size: 12px;">
+            <p style="margin: 0 0 6px 0;"><strong>⚠ Tu sesión de EPEC expiró.</strong> Volvé a ingresar en la Oficina
+                Virtual para seguir actualizando tus consumos. Los envíos de email quedan pausados hasta entonces.</p>
+            <button id="route-relogin">Ingresar a EPEC</button>
+        </div>
+
         <div class="tabs">
             <button class="tab-btn active" data-target="tab-reportes">Reportes</button>
             <button class="tab-btn" data-target="tab-notificaciones">Notificaciones</button>

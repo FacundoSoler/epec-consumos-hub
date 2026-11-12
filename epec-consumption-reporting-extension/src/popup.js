@@ -1,5 +1,8 @@
 import { localStorageKeys } from './storage/localStorageKeys.js';
 import { summarizeConsumption, toKwh } from './utils/consumptionMetrics.js';
+import { store } from './storage/store.js';
+
+const EPEC_LOGIN_URL = 'https://www.epec.com.ar/usuario/ingreso?returnTo=%2Foficina-virtual%2Fmis-datos';
 
 document.addEventListener('DOMContentLoaded', () => {
     const unauthView = document.getElementById('unauth-view');
@@ -45,10 +48,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     setEmailReportsDaysOfTheWeek();
 
-    routeBtn.addEventListener('click', () => {
-        const destination = "https://www.epec.com.ar/usuario/ingreso?returnTo=%2Foficina-virtual%2Fmis-datos";
-        chrome.tabs.create({ url: destination });
-    });
+    const openEpecLogin = () => chrome.tabs.create({ url: EPEC_LOGIN_URL });
+    routeBtn.addEventListener('click', openEpecLogin);
+    document.getElementById('route-relogin').addEventListener('click', openEpecLogin);
 
     routeLogOff.addEventListener('click', () => {
         chrome.runtime.sendMessage({ action: "logOff" }, (response) => {
@@ -151,6 +153,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const contractId = result.epecUser.contratos[0]?.id ?? '';
             userdisplay.textContent = `${result.epecUser.nombre} ${result.epecUser.apellido} - Contrato: ${contractId}`;
         }
+    });
+
+    store.isSessionExpired().then((expired) => {
+        document.getElementById('session-expired').classList.toggle('hidden', !expired);
     });
 
     chrome.storage.local.get([localStorageKeys.CONSUMPTION_DATA, localStorageKeys.LAST_UPDATED], (result) => {

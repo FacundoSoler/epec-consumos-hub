@@ -13,13 +13,16 @@ export async function sendDailyReportIfDue(apiBaseUrl) {
     const stored = await chrome.storage.local.get([
         localStorageKeys.NOTIFICATION_PREFERENCES,
         localStorageKeys.CONSUMPTION_DATA,
-        localStorageKeys.LAST_REPORT_SENT_ON
+        localStorageKeys.LAST_REPORT_SENT_ON,
+        localStorageKeys.SESSION_EXPIRED
     ]);
 
     const today = getCordobaDateKey();
     const reportPrefs = stored[localStorageKeys.NOTIFICATION_PREFERENCES]?.email_reports;
     const consumptionData = stored[localStorageKeys.CONSUMPTION_DATA];
 
+    // The server would reject the expired token anyway; skipping avoids a pointless failing call.
+    if (stored[localStorageKeys.SESSION_EXPIRED] === true) return;
     if (!reportPrefs?.enabled) return;
     if (!reportPrefs.days?.includes(getCordobaWeekday())) return;
     if (stored[localStorageKeys.LAST_REPORT_SENT_ON] === today) return;
