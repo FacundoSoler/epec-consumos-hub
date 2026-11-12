@@ -23,7 +23,7 @@ flowchart LR
 
 ### Chrome extension (`epec-consumption-reporting-extension/`)
 
-Plain ES modules loaded directly by Chrome (no build step, see "Decisions").
+Plain JS ES modules bundled by Vite into `dist/`, which is what Chrome loads (see "Decisions"). `npm run build` targets Railway; `npm run build:dev` targets `http://localhost:3000` and keeps it in `host_permissions`.
 
 | File | Responsibility |
 |---|---|
@@ -137,7 +137,7 @@ sequenceDiagram
 | Decision | Why |
 |---|---|
 | **No server-side user data** (Postgres removed) | The earlier design stored encrypted EPEC tokens, emails and contracts for a server cron. Sending on demand from the user's browser avoids holding sensitive data and removes stale-token, cleanup and encryption-key problems. Cost: a report only goes out on days the user opens Chrome. |
-| **Extension stays plain JS** | Chrome cannot execute TypeScript. A build step (Vite/tsc → `dist/`) can be added later; until then `tsconfig.json` only provides editor types (`allowJs`, `noEmit`). |
+| **Extension source stays plain JS, built with Vite** | `build/build.js` runs Vite without extension plugins: background + popup as ES modules, each content script as a self-contained IIFE (MV3 content scripts cannot be modules). The API URL is a build-time `define` and `dist/manifest.json` is generated per mode, so production carries no `localhost`. Migrating to TypeScript is a separate decision; `tsconfig.json` only provides editor types (`allowJs`, `noEmit`). |
 | **EPEC called directly from the extension** | The extension already holds the user's token; proxying through the server added latency and a dependency on server uptime. The `web-prod` key is EPEC's public web key. |
 | **Token check via `GET /usuarios/contratos`** | Cheapest authenticated EPEC call; EPEC does not publish a key to verify its JWTs. |
 
@@ -155,7 +155,6 @@ Both projects use Vitest: 53 server tests and 108 extension tests. `npm test` at
 - **Expired EPEC token:** reports fail with 401 until the user visits epec.com.ar again. The extension logs it and retries on the next refresh.
 - **Alerts:** `/sendEmailAlert` exists, but the extension does not compute threshold alerts yet (the alert UI is hidden in the popup).
 - **One contract per user:** only `contratos[0]` is used.
-- **`IS_PRODUCTION` flag** in `background.js` is `true` (Railway) in the repo and switched to `false` by hand for local development; a build step would allow a build-time env and separate dev/prod manifests (dropping `localhost:3000` from production `host_permissions`).
 - **Old database:** the Railway Postgres from the previous design may still hold encrypted tokens and emails of users who opted in. Purge it or drop the database. This is a manual step outside the code.
 - **Rate limiter:** single instance only (see above).
 

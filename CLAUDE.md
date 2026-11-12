@@ -10,6 +10,7 @@ Repo root (runs both sub-projects in sequence; exits 1 if either fails):
 - Install everything: `npm run install:all`
 - All tests: `npm test`
 - Typecheck everything: `npm run check`
+- Build the extension (production): `npm run build`
 
 Server (`epec-consumos-webhooks-server/`):
 - Dev server: `npm run dev` (http://localhost:3000)
@@ -19,7 +20,8 @@ Server (`epec-consumos-webhooks-server/`):
 Extension (`epec-consumption-reporting-extension/`):
 - Tests: `npm run test:run`; one file: `npx vitest run tests/background.test.js`
 - Parse check: `npm run typecheck`
-- Load in Chrome: chrome://extensions > Developer mode > Load unpacked > the extension folder
+- Build: `npm run build:dev` (API on http://localhost:3000) or `npm run build` (Railway, no localhost in the manifest)
+- Load in Chrome: chrome://extensions > Developer mode > Load unpacked > `dist/` (rebuild and reload after each change)
 
 ## Testing
 
@@ -29,7 +31,8 @@ Extension (`epec-consumption-reporting-extension/`):
 
 ## Gotchas
 
-- Extension sources are plain `.js` on purpose: Chrome loads files as-is and cannot run TypeScript. Do not add `.ts` under the extension's `src/` until a build step exists.
+- Extension sources stay plain `.js` (a TypeScript migration is a separate decision). Vite bundles them into `dist/` via `build/build.js`; content scripts are built as classic IIFE scripts because MV3 content scripts cannot be ES modules.
+- The server URL is `__API_BASE_URL__`, injected by the build (`build/buildModes.js`) and by `vitest.config.js` in tests. `dist/manifest.json` is generated from `manifest.json`; edit the source, not `dist/`.
 - Server imports use `.js` extensions even for `.ts` files (NodeNext).
 - No user data is stored server-side; the old Postgres layer was removed deliberately. Discuss before adding persistence.
 - Email recipients come from the verified EPEC token (`res.locals.epecUser.email`), never from the request body.
@@ -37,7 +40,6 @@ Extension (`epec-consumption-reporting-extension/`):
 - EPEC returns `consumo` as `"12,4"`; `getEpecData` normalises to numbers and sorts newest first, so `[0]` is the latest day.
 - Dates use `America/Argentina/Cordoba`. Weekdays are `"0".."6"` strings with Sunday = `"0"`. EPEC's `hasta` is `DDMMYYYYHHmm`.
 - `content-main.js` runs in epec.com.ar's own JS context: any `fetch`/XHR patch must hand the original response back, or the site breaks.
-- `IS_PRODUCTION` in `src/background.js` is a manual switch, `true` (Railway) in the repo. Set it to `false` locally to hit `npm run dev`, and do not commit that change.
 
 ## Conventions
 
