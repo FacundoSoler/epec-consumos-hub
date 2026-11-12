@@ -265,7 +265,7 @@
                 </div>
             </div>
 
-            <div class="toggle-header" style="margin-top: 15px; display:none">
+            <div class="toggle-header" style="margin-top: 15px;">
                 <div class="section-title">Alertas de Exceso (Email)</div>
                 <label class="switch">
                     <input type="checkbox" id="toggle-emailAlerts">
@@ -283,14 +283,15 @@
                     <input type="number" id="alert-days" min="1" max="31" step="1" placeholder="Ej: 3">
                 </div>
                 <p style="font-size: 10px; color: #777; margin-top: 0; line-height: 1.2;">
-                    Ej: Si el promedio es 20kWh y evalúas 3 días, la alerta se disparará si el consumo de los últimos 3
-                    días supera los 60kWh.
+                    Ej: Si el límite es 20 kWh y evaluás 3 días, recibirás un email (como máximo uno por día) cuando el
+                    promedio de los últimos 3 días supere los 20 kWh por día. Hasta tener esa cantidad de lecturas en el
+                    período actual no se envían alertas.
                 </p>
             </div>
 
             <button id="save-notifications" style="margin-top: 15px;">Guardar Cambios</button>
             <div id="save-status"
-                style="font-size: 12px; color: #00875a; margin-top: 5px; text-align: center; height: 14px;"></div>
+                style="font-size: 12px; color: #00875a; margin-top: 5px; text-align: center; min-height: 14px;"></div>
         </div>
 
     </div>

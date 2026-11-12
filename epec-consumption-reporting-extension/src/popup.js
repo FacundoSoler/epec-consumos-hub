@@ -2,6 +2,7 @@ import { localStorageKeys } from './storage/localStorageKeys.js';
 import { summarizeConsumption, toKwh } from './utils/consumptionMetrics.js';
 import { store } from './storage/store.js';
 import { showSessionExpiredBadge } from './services/sessionService.js';
+import { validateAlertThreshold } from './services/alertService.js';
 
 const EPEC_LOGIN_URL = 'https://www.epec.com.ar/usuario/ingreso?returnTo=%2Foficina-virtual%2Fmis-datos';
 
@@ -111,8 +112,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveNotificationsBtn = document.getElementById('save-notifications');
     saveNotificationsBtn.addEventListener('click', () => {
         const selectedDays = Array.from(document.querySelectorAll('.day-cb:checked')).map(cb => cb.value);
-        const avgPerDay = parseFloat(document.getElementById('alert-avg').value) || 0;
-        const daysToEval = parseInt(document.getElementById('alert-days').value, 10) || 0;
+        const threshold = {
+            kwh_limit_per_day: Number(document.getElementById('alert-avg').value),
+            rolling_days_window: Number(document.getElementById('alert-days').value)
+        };
+        const saveStatus = document.getElementById('save-status');
+
+        const thresholdError = toggleEmailAlerts.checked ? validateAlertThreshold(threshold) : null;
+        if (thresholdError) {
+            saveStatus.textContent = thresholdError;
+            saveStatus.style.color = 'red';
+            return;
+        }
 
         const preferences = {
             email_reports: {
@@ -121,14 +132,9 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             email_alerts: {
                 enabled: toggleEmailAlerts.checked,
-                threshold: {
-                    kwh_limit_per_day: avgPerDay,
-                    rolling_days_window: daysToEval
-                }
+                threshold
             }
         };
-
-        const saveStatus = document.getElementById('save-status');
 
         chrome.runtime.sendMessage({ action: 'save_notifications', payload: preferences }, (response) => {
             if (response && response.success) {
