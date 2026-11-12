@@ -1,11 +1,16 @@
 {
+  "name": "epec-consumption-reporting-extension",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "tsc -p .",
+    "test": "vitest",
+    "test:run": "vitest run"
+  },
   "devDependencies": {
     "@types/chrome": "^0.2.6",
-    "@types/node": "^26.2.0"
-  },
-  "dependencies": {
     "typescript": "^7.0.2",
-    "vite": "^8.2.1",
     "vitest": "^4.1.10"
   }
 }
