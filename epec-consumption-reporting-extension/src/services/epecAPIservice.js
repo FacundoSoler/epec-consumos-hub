@@ -1,4 +1,35 @@
 import { EPEC_API_BASE_URL, EPEC_API_KEY } from '../constants.js';
+import { createLogger, documentoFromToken, hashUser } from '../utils/logger.js';
+
+const log = createLogger('epec');
+
+/** @typedef {'session-expired' | 'epec-unavailable' | 'request-error'} EpecErrorKind */
+
+/** Carries its classification so callers (e.g. a "session expired" UI) can branch on `kind`. */
+export class EpecApiError extends Error {
+    /**
+     * @param {string} message
+     * @param {{ kind: EpecErrorKind, status?: number, path: string, cause?: unknown }} details
+     */
+    constructor(message, { kind, status, path, cause }) {
+        super(message, { cause });
+        this.name = 'EpecApiError';
+        this.kind = kind;
+        this.status = status;
+        this.path = path;
+    }
+}
+
+/**
+ * Single source of truth for how an EPEC failure is interpreted; a missing status means the network call failed.
+ * @param {number} [status]
+ * @returns {EpecErrorKind}
+ */
+export function classifyEpecFailure(status) {
+    if (status === 401 || status === 403) return 'session-expired';
+    if (status === undefined || status >= 500) return 'epec-unavailable';
+    return 'request-error';
+}
 
 /**
  * @typedef {Object} ConsumptionDetails
@@ -8,18 +39,40 @@ import { EPEC_API_BASE_URL, EPEC_API_KEY } from '../constants.js';
  */
 
 async function epecFetch(path, bearerToken) {
-    const response = await fetch(`${EPEC_API_BASE_URL}${path}`, {
-        headers: {
-            apikey: EPEC_API_KEY,
-            Authorization: `Bearer ${bearerToken}`
-        }
-    });
+    let response;
+    try {
+        response = await fetch(`${EPEC_API_BASE_URL}${path}`, {
+            headers: {
+                apikey: EPEC_API_KEY,
+                Authorization: `Bearer ${bearerToken}`
+            }
+        });
+    } catch (cause) {
+        throw await logAndBuildEpecError(`EPEC API ${path} could not be reached`, { path, bearerToken, cause });
+    }
 
     if (!response.ok) {
-        throw new Error(`EPEC API ${path} responded with status ${response.status}`);
+        throw await logAndBuildEpecError(`EPEC API ${path} responded with status ${response.status}`, { path, bearerToken, status: response.status });
     }
 
     return response.json();
+}
+
+async function logAndBuildEpecError(message, { path, bearerToken, status, cause }) {
+    const error = new EpecApiError(message, { kind: classifyEpecFailure(status), status, path: stripQuery(path), cause });
+    log.error('EPEC request failed', {
+        kind: error.kind,
+        status,
+        path: error.path,
+        cause: cause instanceof Error ? cause.message : undefined,
+        user: await hashUser(documentoFromToken(bearerToken))
+    });
+    return error;
+}
+
+// Query strings only hold dates today, but logging the bare path keeps that guarantee if they change.
+function stripQuery(path) {
+    return path.split('?')[0];
 }
 
 export function getContratos(bearerToken) {

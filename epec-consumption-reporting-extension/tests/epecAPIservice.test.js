@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getContratos, getContractCurrentPeriod, getEpecData } from '../src/services/epecAPIservice.js';
+import { EpecApiError, classifyEpecFailure, getContratos, getContractCurrentPeriod, getEpecData } from '../src/services/epecAPIservice.js';
+import { hashUser } from '../src/utils/logger.js';
 
 function mockFetchJson(body, { ok = true, status = 200 } = {}) {
     const fetchMock = vi.fn().mockResolvedValue({ ok, status, json: async () => body });
@@ -7,7 +8,17 @@ function mockFetchJson(body, { ok = true, status = 200 } = {}) {
     return fetchMock;
 }
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+});
+
+const base64Url = (value) => btoa(JSON.stringify(value)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const userToken = `${base64Url({ alg: 'HS256' })}.${base64Url({ documento: 30111222, email: 'ana@example.com' })}.sig`;
+
+function captureErrorLogs() {
+    return vi.spyOn(console, 'error').mockImplementation(() => {});
+}
 
 describe('epecFetch headers and errors', () => {
     it('sends the EPEC apikey and the Bearer token', async () => {
@@ -30,9 +41,68 @@ describe('epecFetch headers and errors', () => {
     });
 
     it('throws with the status instead of resolving to undefined', async () => {
+        captureErrorLogs();
         mockFetchJson({}, { ok: false, status: 401 });
 
         await expect(getContratos('expired')).rejects.toThrow('status 401');
+    });
+});
+
+describe('classifyEpecFailure', () => {
+    it.each([
+        [401, 'session-expired'],
+        [403, 'session-expired'],
+        [500, 'epec-unavailable'],
+        [503, 'epec-unavailable'],
+        [undefined, 'epec-unavailable'],
+        [400, 'request-error'],
+        [404, 'request-error']
+    ])('classifies status %s as %s', (status, kind) => {
+        expect(classifyEpecFailure(status)).toBe(kind);
+    });
+});
+
+describe('epecFetch classified errors', () => {
+    it.each([
+        [401, 'session-expired'],
+        [403, 'session-expired'],
+        [502, 'epec-unavailable'],
+        [404, 'request-error']
+    ])('throws an EpecApiError for status %s with kind %s and logs it with the hashed user', async (status, kind) => {
+        const errorLog = captureErrorLogs();
+        mockFetchJson({}, { ok: false, status });
+
+        const error = await getContratos(userToken).catch((e) => e);
+
+        expect(error).toBeInstanceOf(EpecApiError);
+        expect(error).toMatchObject({ kind, status, path: '/usuarios/contratos' });
+        const raw = errorLog.mock.calls[0][0];
+        expect(JSON.parse(raw)).toMatchObject({ level: 'error', area: 'epec', kind, status, path: '/usuarios/contratos', user: await hashUser(30111222) });
+        expect(raw).not.toContain('30111222');
+        expect(raw).not.toContain('ana@example.com');
+        expect(raw).not.toContain(userToken);
+    });
+
+    it('classifies a network failure as epec-unavailable and keeps the cause', async () => {
+        const errorLog = captureErrorLogs();
+        const networkError = new TypeError('Failed to fetch');
+        vi.stubGlobal('fetch', vi.fn().mockRejectedValue(networkError));
+
+        const error = await getContratos(userToken).catch((e) => e);
+
+        expect(error).toMatchObject({ name: 'EpecApiError', kind: 'epec-unavailable', status: undefined, cause: networkError });
+        expect(JSON.parse(errorLog.mock.calls[0][0])).toMatchObject({ kind: 'epec-unavailable', cause: 'Failed to fetch', user: await hashUser(30111222) });
+    });
+
+    it('logs the path without its query string and omits the user for an unreadable token', async () => {
+        const errorLog = captureErrorLogs();
+        mockFetchJson({}, { ok: false, status: 500 });
+
+        await getEpecData('C-1', 'opaque-token', '01112026', '121120262359').catch(() => {});
+
+        const entry = JSON.parse(errorLog.mock.calls[0][0]);
+        expect(entry.path).toBe('/usuarios/contratos/C-1/consumos/con-telemedicion/MED_INTELIGENTE/CONSUMO_DIARIO');
+        expect(entry.user).toBeUndefined();
     });
 });
 
