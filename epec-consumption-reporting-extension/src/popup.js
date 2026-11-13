@@ -8,8 +8,11 @@ import {
     QUICK_DAY_SELECTIONS,
     ROLLING_DAYS_OPTIONS,
     WEEKDAY_OPTIONS,
-    buildNotificationPreferences,
+    buildAlertsSection,
+    buildReportsSection,
+    mergeSectionIntoPreferences,
     orderDaysMondayFirst,
+    shouldShowNoDaysHint,
     resolveAlertSelection,
     toggleDay
 } from './utils/notificationOptions.js';
@@ -49,18 +52,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     toggleEmail.addEventListener('change', () => {
         handleToggleChange(toggleEmail, panelEmail);
-        saveNotificationPreferences(reportsSaveStatus);
+        refreshNoDaysHint();
+        saveReportsSection();
     });
     toggleEmailAlerts.addEventListener('change', () => {
         handleToggleChange(toggleEmailAlerts, panelAlerts);
-        saveNotificationPreferences(alertsSaveStatus);
+        saveAlertsSection();
     });
-    avgSelect.addEventListener('change', () => saveNotificationPreferences(alertsSaveStatus));
-    daysSelect.addEventListener('change', () => saveNotificationPreferences(alertsSaveStatus));
+    avgSelect.addEventListener('change', saveAlertsSection);
+    daysSelect.addEventListener('change', saveAlertsSection);
 
     let selectedDays = [];
+    let storedPreferences;
     const dayPills = renderDayPills();
-    renderQuickDaySelections();
+    const quickDayButtons = renderQuickDaySelections();
+    // Until storage answers, a change would overwrite the stored preferences with the defaults on screen.
+    setNotificationControlsEnabled(false);
 
     const openEpecLogin = () => chrome.tabs.create({ url: EPEC_LOGIN_URL });
     routeBtn.addEventListener('click', openEpecLogin);
@@ -228,29 +235,43 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderQuickDaySelections() {
-        document.getElementById('quick-days').replaceChildren(...QUICK_DAY_SELECTIONS.map((quick) => {
+        const buttons = QUICK_DAY_SELECTIONS.map((quick) => {
             const link = document.createElement('button');
             link.type = 'button';
             link.className = 'quick-day';
             link.textContent = quick.label;
             link.addEventListener('click', () => selectDaysAndSave([...quick.days]));
             return link;
-        }));
+        });
+        document.getElementById('quick-days').replaceChildren(...buttons);
+        return buttons;
     }
 
     function showSelectedDays(days) {
         selectedDays = days;
         dayPills.forEach((pill) => pill.setAttribute('aria-pressed', String(days.includes(pill.dataset.value))));
+        refreshNoDaysHint();
+    }
+
+    function refreshNoDaysHint() {
+        document.getElementById('no-days-hint').classList.toggle('hidden', !shouldShowNoDaysHint(toggleEmail.checked, selectedDays));
+    }
+
+    function setNotificationControlsEnabled(enabled) {
+        [toggleEmail, toggleEmailAlerts, avgSelect, daysSelect, ...dayPills, ...quickDayButtons]
+            .forEach((control) => { control.disabled = !enabled; });
     }
 
     function selectDaysAndSave(days) {
         showSelectedDays(days);
-        saveNotificationPreferences(reportsSaveStatus);
+        saveReportsSection();
     }
 
     function loadStoredNotificationPreferences() {
         chrome.storage.local.get([localStorageKeys.NOTIFICATION_PREFERENCES], (data) => {
-            showNotificationPreferences(data[localStorageKeys.NOTIFICATION_PREFERENCES]);
+            storedPreferences = data[localStorageKeys.NOTIFICATION_PREFERENCES];
+            showNotificationPreferences(storedPreferences);
+            setNotificationControlsEnabled(true);
         });
     }
 
@@ -264,17 +285,26 @@ document.addEventListener('DOMContentLoaded', () => {
         showAlertSelection(resolveAlertSelection(prefs?.email_alerts?.threshold));
     }
 
-    function saveNotificationPreferences(statusElement) {
-        const preferences = buildNotificationPreferences({
-            reportsEnabled: toggleEmail.checked,
-            reportDays: selectedDays,
+    function saveReportsSection() {
+        const reports = buildReportsSection({ reportsEnabled: toggleEmail.checked, reportDays: selectedDays });
+        saveSection('email_reports', reports, reportsSaveStatus);
+    }
+
+    function saveAlertsSection() {
+        const alerts = buildAlertsSection({
             alertsEnabled: toggleEmailAlerts.checked,
             kwhLimit: avgSelect.value,
             rollingDays: daysSelect.value
         });
+        saveSection('email_alerts', alerts, alertsSaveStatus);
+    }
+
+    function saveSection(section, sectionValue, statusElement) {
+        const preferences = mergeSectionIntoPreferences(storedPreferences, section, sectionValue);
 
         chrome.runtime.sendMessage({ action: 'save_notifications', payload: preferences }, (response) => {
             if (!chrome.runtime.lastError && response?.success) {
+                storedPreferences = preferences;
                 showSaveStatus(statusElement, 'Guardado ✓', false);
                 return;
             }

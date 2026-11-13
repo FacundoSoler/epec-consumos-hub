@@ -3,7 +3,11 @@ import {
     KWH_LIMIT_OPTIONS,
     QUICK_DAY_SELECTIONS,
     WEEKDAY_OPTIONS,
+    buildAlertsSection,
     buildNotificationPreferences,
+    buildReportsSection,
+    mergeSectionIntoPreferences,
+    shouldShowNoDaysHint,
     orderDaysMondayFirst,
     toggleDay,
     ROLLING_DAYS_OPTIONS,
@@ -141,5 +145,56 @@ describe('buildNotificationPreferences', () => {
                 expect(validateAlertThreshold(email_alerts.threshold)).toBeNull();
             }
         }
+    });
+});
+
+describe('mergeSectionIntoPreferences', () => {
+    const stored = {
+        email_reports: { enabled: true, days: ['0', '3'] },
+        email_alerts: { enabled: true, threshold: { kwh_limit_per_day: 17.5, rolling_days_window: 40 } }
+    };
+
+    it('changing reports keeps an off-list stored threshold untouched', () => {
+        const reports = buildReportsSection({ reportsEnabled: true, reportDays: ['1'] });
+
+        const merged = mergeSectionIntoPreferences(stored, 'email_reports', reports);
+
+        expect(merged).toStrictEqual({ email_reports: { enabled: true, days: ['1'] }, email_alerts: stored.email_alerts });
+    });
+
+    it('changing alerts keeps the stored days untouched, in their stored order', () => {
+        const alerts = buildAlertsSection({ alertsEnabled: false, kwhLimit: '20', rollingDays: '3' });
+
+        const merged = mergeSectionIntoPreferences(stored, 'email_alerts', alerts);
+
+        expect(merged.email_reports).toBe(stored.email_reports);
+        expect(merged.email_alerts).toStrictEqual({ enabled: false, threshold: { kwh_limit_per_day: 20, rolling_days_window: 3 } });
+    });
+
+    it('fills the untouched section with defaults when nothing is stored yet', () => {
+        const reports = buildReportsSection({ reportsEnabled: true, reportDays: ['1'] });
+
+        expect(mergeSectionIntoPreferences(undefined, 'email_reports', reports).email_alerts)
+            .toStrictEqual({ enabled: false, threshold: { kwh_limit_per_day: 15, rolling_days_window: 3 } });
+        expect(mergeSectionIntoPreferences({}, 'email_alerts', buildAlertsSection({ kwhLimit: 5, rollingDays: 1 })).email_reports)
+            .toStrictEqual({ enabled: false, days: [] });
+    });
+
+    it('does not mutate the stored preferences', () => {
+        const copy = structuredClone(stored);
+        mergeSectionIntoPreferences(stored, 'email_reports', { enabled: false, days: [] });
+        expect(stored).toStrictEqual(copy);
+    });
+});
+
+describe('shouldShowNoDaysHint', () => {
+    it('shows the hint when reports are enabled without days', () => {
+        expect(shouldShowNoDaysHint(true, [])).toBe(true);
+        expect(shouldShowNoDaysHint(true, undefined)).toBe(true);
+    });
+
+    it('hides it when a day is selected or reports are off', () => {
+        expect(shouldShowNoDaysHint(true, ['1'])).toBe(false);
+        expect(shouldShowNoDaysHint(false, [])).toBe(false);
     });
 });

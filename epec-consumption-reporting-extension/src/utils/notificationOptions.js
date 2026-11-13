@@ -54,18 +54,32 @@ export function toggleDay(days, value) {
     return orderDaysMondayFirst([...selected]);
 }
 
-export function buildNotificationPreferences({ reportsEnabled, reportDays, alertsEnabled, kwhLimit, rollingDays }) {
+export function buildReportsSection({ reportsEnabled, reportDays }) {
+    return { enabled: reportsEnabled === true, days: orderDaysMondayFirst(reportDays) };
+}
+
+export function buildAlertsSection({ alertsEnabled, kwhLimit, rollingDays }) {
     return {
-        email_reports: {
-            enabled: reportsEnabled === true,
-            days: orderDaysMondayFirst(reportDays)
-        },
-        email_alerts: {
-            enabled: alertsEnabled === true,
-            threshold: {
-                kwh_limit_per_day: Number(kwhLimit),
-                rolling_days_window: Number(rollingDays)
-            }
-        }
+        enabled: alertsEnabled === true,
+        threshold: { kwh_limit_per_day: Number(kwhLimit), rolling_days_window: Number(rollingDays) }
     };
+}
+
+export function buildNotificationPreferences(controls) {
+    return { email_reports: buildReportsSection(controls), email_alerts: buildAlertsSection(controls) };
+}
+
+// Only the section the user touched is rebuilt, so a stored value the controls cannot show
+// (e.g. a 17.5 kWh threshold from before the dropdowns) survives edits to the other section.
+export function mergeSectionIntoPreferences(storedPrefs, section, sectionValue) {
+    return {
+        email_reports: storedPrefs?.email_reports ?? buildReportsSection({ reportDays: [] }),
+        email_alerts: storedPrefs?.email_alerts
+            ?? buildAlertsSection({ kwhLimit: DEFAULT_KWH_LIMIT, rollingDays: DEFAULT_ROLLING_DAYS }),
+        [section]: sectionValue
+    };
+}
+
+export function shouldShowNoDaysHint(reportsEnabled, reportDays) {
+    return reportsEnabled === true && orderDaysMondayFirst(reportDays).length === 0;
 }
