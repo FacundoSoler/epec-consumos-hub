@@ -15,7 +15,7 @@ Repo root (runs both sub-projects in sequence; exits 1 if either fails):
 - Server: `npm run server:dev` (restarts on change) or `npm run server:start` (like Railway)
 
 Server (`epec-consumos-webhooks-server/`):
-- Dev server: `npm run dev` (http://localhost:3000)
+- Dev server: `npm run dev` (http://localhost:3000); `GET /api/health` answers `{ "status": "ok" }` with no auth, to check it is up
 - Tests: `npm run test:run`; one file: `npx vitest run src/middleware/requireEpecToken.test.ts`
 - Typecheck: `npm run typecheck` (`tsx` does not typecheck, so `npm run dev` can start with type errors)
 

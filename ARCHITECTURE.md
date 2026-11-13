@@ -44,6 +44,7 @@ Stateless Express 5 + TypeScript, run with `tsx`.
 
 ```
 routes/emailRoutes.ts               POST /api/email/sendEmailNotification | /sendEmailAlert
+routes/healthRoutes.ts              GET /api/health (no auth, no limit)
 middleware/requireEpecToken.ts      Bearer token → EPEC must accept it → res.locals.epecUser {email, documento}
 middleware/limitOneEmailPerDay.ts   one email per kind per user per Córdoba day (429 otherwise)
 controllers/emailController.ts      validates {subject, htmlContent}, sends to the token's email
@@ -57,6 +58,8 @@ config.ts                           getPort(): PORT from env, 3000 fallback
 
 ### Server
 
+`GET /api/health` → `200 { "status": "ok" }`. No auth and no rate limit; it only shows the process is up.
+
 `POST /api/email/sendEmailNotification` and `POST /api/email/sendEmailAlert`
 
 ```http
@@ -68,7 +71,7 @@ Content-Type: application/json
 
 | Status | Meaning |
 |---|---|
-| 200 | Sent to the email inside the verified token |
+| 200 | `{ "status": "sent" }`: sent to the email inside the verified token |
 | 400 | Missing/invalid subject or htmlContent, or token has no email/documento |
 | 401 | Missing Bearer header, or EPEC rejected the token |
 | 429 | This user already received this kind of email today |
