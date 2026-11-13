@@ -2,8 +2,8 @@ import { localStorageKeys } from './storage/localStorageKeys.js';
 import { summarizeConsumption, toKwh } from './utils/consumptionMetrics.js';
 import { resolveSelectedContract, store } from './storage/store.js';
 import { showSessionExpiredBadge } from './services/sessionService.js';
-import { validateAlertThreshold } from './services/alertService.js';
 import { buildPopupStatusLines } from './utils/emailStatusText.js';
+import { KWH_LIMIT_OPTIONS, ROLLING_DAYS_OPTIONS, resolveAlertSelection } from './utils/notificationOptions.js';
 
 const EPEC_LOGIN_URL = 'https://www.epec.com.ar/usuario/ingreso?returnTo=%2Foficina-virtual%2Fmis-datos';
 
@@ -20,24 +20,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const toggleEmailAlerts = document.getElementById('toggle-emailAlerts');
     const panelAlerts = document.getElementById('panel-alerts');
 
-    const blockInvalidChars = (e) => {
-        if (['-', '+', 'e', 'E'].includes(e.key)) {
-            e.preventDefault();
-        }
-    };
-
-    const avgInput = document.getElementById('alert-avg');
-    if (avgInput) avgInput.addEventListener('keydown', blockInvalidChars);
-
-    const daysInput = document.getElementById('alert-days');
-    if (daysInput) {
-        daysInput.addEventListener('keydown', blockInvalidChars);
-        daysInput.addEventListener('keydown', (e) => {
-            if (e.key === '.' || e.key === ',') {
-                e.preventDefault();
-            }
-        });
-    }
+    const avgSelect = document.getElementById('alert-avg');
+    const daysSelect = document.getElementById('alert-days');
+    fillNumberOptions(avgSelect, KWH_LIMIT_OPTIONS);
+    fillNumberOptions(daysSelect, ROLLING_DAYS_OPTIONS);
+    showAlertSelection(resolveAlertSelection(undefined));
 
     const handleToggleChange = (toggleEl, panelEl) => {
         if (toggleEl.checked) {
@@ -112,18 +99,10 @@ document.addEventListener('DOMContentLoaded', () => {
     saveNotificationsBtn.addEventListener('click', () => {
         const selectedDays = Array.from(document.querySelectorAll('.day-cb:checked')).map(cb => cb.value);
         const threshold = {
-            kwh_limit_per_day: Number(document.getElementById('alert-avg').value),
-            rolling_days_window: Number(document.getElementById('alert-days').value)
+            kwh_limit_per_day: Number(avgSelect.value),
+            rolling_days_window: Number(daysSelect.value)
         };
         const saveStatus = document.getElementById('save-status');
-
-        const thresholdError = toggleEmailAlerts.checked ? validateAlertThreshold(threshold) : null;
-        if (thresholdError) {
-            saveStatus.textContent = thresholdError;
-            saveStatus.style.color = 'red';
-            setTimeout(() => { saveStatus.textContent = ''; }, 5000);
-            return;
-        }
 
         const preferences = {
             email_reports: {
@@ -216,10 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 toggleEmailAlerts.checked = prefs.email_alerts.enabled === true;
                 handleToggleChange(toggleEmailAlerts, panelAlerts); // Trigger UI update
 
-                if (prefs.email_alerts.threshold) {
-                    document.getElementById('alert-avg').value = prefs.email_alerts.threshold.kwh_limit_per_day || '';
-                    document.getElementById('alert-days').value = prefs.email_alerts.threshold.rolling_days_window || '';
-                }
+                showAlertSelection(resolveAlertSelection(prefs.email_alerts.threshold));
             }
         }
     });
@@ -274,6 +250,20 @@ document.addEventListener('DOMContentLoaded', () => {
             const dayOfTheWeekHTML = `<label><input type="checkbox" class="day-cb" value=${index}> ${day}</label>`;
             daysGrid.insertAdjacentHTML('beforeend', dayOfTheWeekHTML);
         });
+    }
+
+    function fillNumberOptions(select, values) {
+        select.replaceChildren(...values.map((value) => {
+            const option = document.createElement('option');
+            option.value = String(value);
+            option.textContent = String(value);
+            return option;
+        }));
+    }
+
+    function showAlertSelection({ kwhLimit, rollingDays }) {
+        avgSelect.value = String(kwhLimit);
+        daysSelect.value = String(rollingDays);
     }
 
     function enableLoggedInPanel(loggedIn) {
