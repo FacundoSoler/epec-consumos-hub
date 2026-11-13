@@ -47,6 +47,23 @@ export function buildEmailStatusLine(outcome) {
     }
 }
 
+const REFRESH_FAILED_LINE = { tone: 'error', text: '❌ No se pudieron actualizar los datos de EPEC. Intentá nuevamente en unos instantes.' };
+
+/**
+ * The popup's status lines under "Última actualización". A failed refresh hides the email lines,
+ * since no email was attempted; an expired session shows nothing here because its own banner explains it.
+ * @param {{ refreshError?: string | null, emailStatus?: { report?: object, alert?: object } | null }} state
+ * @returns {EmailStatusLine[]}
+ */
+export function buildPopupStatusLines({ refreshError, emailStatus }) {
+    if (refreshError === 'session-expired') return [];
+    if (refreshError) return [REFRESH_FAILED_LINE];
+
+    return [emailStatus?.report, emailStatus?.alert]
+        .map((outcome) => buildEmailStatusLine(outcome))
+        .filter((line) => line !== null);
+}
+
 /** kWh with at most one decimal and a comma separator, as Argentine users read numbers. */
 export function formatKwh(value) {
     return Number(Number(value).toFixed(1)).toLocaleString('es-AR', { maximumFractionDigits: 1 });

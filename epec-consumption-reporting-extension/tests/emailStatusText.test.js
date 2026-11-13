@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildEmailStatusLine, formatKwh } from '../src/utils/emailStatusText.js';
+import { buildEmailStatusLine, buildPopupStatusLines, formatKwh } from '../src/utils/emailStatusText.js';
 
 const at = new Date(2026, 10, 12, 9, 5).toISOString();
 const recipient = 'fa*****@hotmail.com';
@@ -121,5 +121,27 @@ describe('buildEmailStatusLine: nothing to show', () => {
 describe('formatKwh', () => {
     it.each([[12, '12'], [12.44, '12,4'], [12.46, '12,5'], [0, '0'], [987.25, '987,3']])('%d -> %s', (value, text) => {
         expect(formatKwh(value)).toBe(text);
+    });
+});
+
+describe('buildPopupStatusLines', () => {
+    const emailStatus = { report: outcome('report', 'sent', 'sent', { recipient }), alert: outcome('alert', 'skipped', 'disabled') };
+
+    it('refresh failed: one red line and no email lines', () => {
+        expect(buildPopupStatusLines({ refreshError: 'epec-error', emailStatus })).toEqual([
+            { tone: 'error', text: '❌ No se pudieron actualizar los datos de EPEC. Intentá nuevamente en unos instantes.' }
+        ]);
+    });
+
+    it('session expired: nothing, the session banner explains it', () => {
+        expect(buildPopupStatusLines({ refreshError: 'session-expired', emailStatus })).toEqual([]);
+    });
+
+    it('refresh succeeded: the report line then the alert line', () => {
+        expect(buildPopupStatusLines({ refreshError: null, emailStatus }).map((line) => line.tone)).toEqual(['success', 'neutral']);
+    });
+
+    it('nothing stored yet: no lines', () => {
+        expect(buildPopupStatusLines({ refreshError: undefined, emailStatus: undefined })).toEqual([]);
     });
 });

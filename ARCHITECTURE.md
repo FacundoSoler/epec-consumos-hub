@@ -41,7 +41,7 @@ Plain JS ES modules bundled by Vite into `dist/`, which is what Chrome loads (se
 | `src/utils/logger.js`, `src/utils/html.js`, `src/utils/utils.js` | Structured JSON logger, HTML escaping for email bodies, Córdoba date helpers. |
 | `src/popup.*` | Reports tab (total, daily average, 28-day projection, daily list, last report/alert email status), contract picker when the user has several contracts, session-expired banner, and Notifications tab (report weekdays, alert limit and window). |
 
-Storage keys: `epecUser`, `consumptionData`, `lastUpdated`, `notificationPrefs`, `lastReportSentOn`, `lastAlertSentOn`, `sessionExpired`, `selectedContractId`, `lastEmailStatus` (`{ report, alert }`, the latest outcome of each email, shown in the popup).
+Storage keys: `epecUser`, `consumptionData`, `lastUpdated`, `notificationPrefs`, `lastReportSentOn`, `lastAlertSentOn`, `sessionExpired`, `selectedContractId`, `lastEmailStatus` (`{ report, alert }`, the latest outcome of each email, shown in the popup), `lastRefreshError` (`no-data`, `epec-error` or `session-expired` after a failed refresh, which also clears `lastEmailStatus` so the popup shows one red line instead of email lines; null after a successful refresh).
 
 ### Server (`epec-consumos-webhooks-server/`)
 

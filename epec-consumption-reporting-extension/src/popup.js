@@ -3,7 +3,7 @@ import { summarizeConsumption, toKwh } from './utils/consumptionMetrics.js';
 import { resolveSelectedContract, store } from './storage/store.js';
 import { showSessionExpiredBadge } from './services/sessionService.js';
 import { validateAlertThreshold } from './services/alertService.js';
-import { buildEmailStatusLine } from './utils/emailStatusText.js';
+import { buildPopupStatusLines } from './utils/emailStatusText.js';
 
 const EPEC_LOGIN_URL = 'https://www.epec.com.ar/usuario/ingreso?returnTo=%2Foficina-virtual%2Fmis-datos';
 
@@ -86,12 +86,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            if (!response || !response.success) {
-                console.error('The manual refresh errored out');
-                status.innerText = "La actualizacion ha fallado. Intente nuevamente en unos instantes.";
-                return;
-            }
+            if (!response || !response.success) console.error('The manual refresh errored out');
 
+            // Success or failure, the worker stored the outcome; the reload renders it.
             location.reload();
         });
     });
@@ -193,8 +190,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (result.lastUpdated) status.innerText = `Ultima actualizacion: ${result.lastUpdated}`;
     });
 
-    chrome.storage.local.get([localStorageKeys.LAST_EMAIL_STATUS], (result) => {
-        renderEmailStatus(result[localStorageKeys.LAST_EMAIL_STATUS]);
+    chrome.storage.local.get([localStorageKeys.LAST_EMAIL_STATUS, localStorageKeys.LAST_REFRESH_ERROR], (result) => {
+        renderStatusLines(buildPopupStatusLines({
+            refreshError: result[localStorageKeys.LAST_REFRESH_ERROR],
+            emailStatus: result[localStorageKeys.LAST_EMAIL_STATUS]
+        }));
     });
 
     chrome.storage.local.get([localStorageKeys.NOTIFICATION_PREFERENCES], (data) => {
@@ -240,16 +240,15 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('projectedConsumption').innerHTML = `<b>${Math.round(projected)} </b> kWh`;
     }
 
-    function renderEmailStatus(emailStatus) {
-        renderEmailStatusLine(document.getElementById('email-report-status'), emailStatus?.report);
-        renderEmailStatusLine(document.getElementById('email-alert-status'), emailStatus?.alert);
-    }
-
-    // textContent only: the line can include a server-provided validation message.
-    function renderEmailStatusLine(element, outcome) {
-        const line = buildEmailStatusLine(outcome);
-        element.textContent = line?.text ?? '';
-        element.className = line ? `email-status ${line.tone}` : 'email-status';
+    // textContent only: a line can include a server-provided validation message.
+    function renderStatusLines(lines) {
+        const container = document.getElementById('status-lines');
+        container.replaceChildren(...lines.map((line) => {
+            const element = document.createElement('div');
+            element.className = `email-status ${line.tone}`;
+            element.textContent = line.text;
+            return element;
+        }));
     }
 
     function renderContractPicker(contracts, selectedContract) {

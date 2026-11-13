@@ -293,3 +293,39 @@ describe('email status', () => {
         expect(selectResponse.emailStatus).toMatchObject({ report: { kind: 'report' }, alert: { kind: 'alert' } });
     });
 });
+
+describe('refresh failure state', () => {
+    const previousStatus = { report: { kind: 'report', result: 'sent' }, alert: { kind: 'alert', result: 'skipped' } };
+
+    it('a failed refresh clears lastEmailStatus and stores the error', async () => {
+        mockEpecApi({ readings: [] });
+        const mock = await loadBackground({ epecUser: storedUser, lastEmailStatus: previousStatus });
+
+        await mock.dispatch({ action: 'refreshData' });
+
+        expect(mock.storage.lastEmailStatus).toBeNull();
+        expect(mock.storage.lastRefreshError).toBe('no-data');
+    });
+
+    it('an EPEC 401 stores session-expired as the error', async () => {
+        const fetchMock = mockEpecApi();
+        fetchMock.mockResolvedValue({ ok: false, status: 401, json: async () => ({}) });
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const mock = await loadBackground({ epecUser: storedUser, lastEmailStatus: previousStatus });
+
+        await mock.dispatch({ action: 'refreshData' });
+
+        expect(mock.storage.lastRefreshError).toBe('session-expired');
+        expect(mock.storage.lastEmailStatus).toBeNull();
+    });
+
+    it('a later successful refresh clears the error and saves new email statuses', async () => {
+        mockEpecApi();
+        const mock = await loadBackground({ epecUser: storedUser, lastRefreshError: 'epec-error', lastEmailStatus: null });
+
+        await mock.dispatch({ action: 'refreshData' });
+
+        expect(mock.storage.lastRefreshError).toBeNull();
+        expect(mock.storage.lastEmailStatus).toMatchObject({ report: { kind: 'report' }, alert: { kind: 'alert' } });
+    });
+});

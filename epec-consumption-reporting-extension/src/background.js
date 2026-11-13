@@ -118,23 +118,33 @@ async function fetchData() {
 
         if (data.length === 0) {
             log.warn('No consumption data found to calculate.');
-            return { success: false, emailStatus: null };
+            return recordRefreshFailure('no-data');
         }
 
         await clearSessionExpired();
         await flagNewReadings(data);
         await chrome.storage.local.set({
             [localStorageKeys.CONSUMPTION_DATA]: data,
-            [localStorageKeys.LAST_UPDATED]: new Date().toLocaleString()
+            [localStorageKeys.LAST_UPDATED]: new Date().toLocaleString(),
+            [localStorageKeys.LAST_REFRESH_ERROR]: null
         });
         const emailStatus = await sendEmailsIfDue();
 
         return { success: true, emailStatus };
     } catch (err) {
         log.error('Fetch failed', describeError(err));
-        await markSessionExpiredIfRejected(err, bearerToken);
-        return { success: false, emailStatus: null };
+        const sessionExpired = await markSessionExpiredIfRejected(err, bearerToken);
+        return recordRefreshFailure(sessionExpired ? 'session-expired' : 'epec-error');
     }
+}
+
+// No email was attempted, so the previous email lines would describe an older refresh.
+async function recordRefreshFailure(reason) {
+    await chrome.storage.local.set({
+        [localStorageKeys.LAST_REFRESH_ERROR]: reason,
+        [localStorageKeys.LAST_EMAIL_STATUS]: null
+    });
+    return { success: false, emailStatus: null };
 }
 
 async function loadContractReadings(contractId, bearerToken) {
