@@ -251,6 +251,13 @@
             color: #777;
         }
 
+        .day-pills-label {
+            font-size: 12px;
+            color: #555;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
         .no-days-hint {
             font-size: 11px;
             color: #777;
@@ -350,7 +357,8 @@
             <div id="save-status-reports" class="save-status" role="status" aria-live="polite"></div>
 
             <div id="panel-email" class="settings-panel hidden">
-                <div class="day-pills" id="day-pills" role="group" aria-label="Días de envío"></div>
+                <div id="day-pills-label" class="day-pills-label">Elegí los días en que querés recibir el reporte:</div>
+                <div class="day-pills" id="day-pills" role="group" aria-labelledby="day-pills-label"></div>
                 <div class="quick-days" id="quick-days"></div>
                 <div id="no-days-hint" class="no-days-hint hidden">Elegí al menos un día para recibir el reporte.</div>
             </div>
