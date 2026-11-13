@@ -3,7 +3,15 @@ import { summarizeConsumption, toKwh } from './utils/consumptionMetrics.js';
 import { resolveSelectedContract, store } from './storage/store.js';
 import { showSessionExpiredBadge } from './services/sessionService.js';
 import { buildPopupStatusLines } from './utils/emailStatusText.js';
-import { KWH_LIMIT_OPTIONS, ROLLING_DAYS_OPTIONS, resolveAlertSelection } from './utils/notificationOptions.js';
+import {
+    KWH_LIMIT_OPTIONS,
+    QUICK_DAY_SELECTIONS,
+    ROLLING_DAYS_OPTIONS,
+    WEEKDAY_OPTIONS,
+    orderDaysMondayFirst,
+    resolveAlertSelection,
+    toggleDay
+} from './utils/notificationOptions.js';
 
 const EPEC_LOGIN_URL = 'https://www.epec.com.ar/usuario/ingreso?returnTo=%2Foficina-virtual%2Fmis-datos';
 
@@ -37,7 +45,9 @@ document.addEventListener('DOMContentLoaded', () => {
     toggleEmail.addEventListener('change', () => handleToggleChange(toggleEmail, panelEmail));
     toggleEmailAlerts.addEventListener('change', () => handleToggleChange(toggleEmailAlerts, panelAlerts));
 
-    setEmailReportsDaysOfTheWeek();
+    let selectedDays = [];
+    const dayPills = renderDayPills();
+    renderQuickDaySelections();
 
     const openEpecLogin = () => chrome.tabs.create({ url: EPEC_LOGIN_URL });
     routeBtn.addEventListener('click', openEpecLogin);
@@ -97,7 +107,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const saveNotificationsBtn = document.getElementById('save-notifications');
     saveNotificationsBtn.addEventListener('click', () => {
-        const selectedDays = Array.from(document.querySelectorAll('.day-cb:checked')).map(cb => cb.value);
         const threshold = {
             kwh_limit_per_day: Number(avgSelect.value),
             rolling_days_window: Number(daysSelect.value)
@@ -184,11 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 toggleEmail.checked = prefs.email_reports.enabled === true;
                 handleToggleChange(toggleEmail, panelEmail); // Trigger UI update
 
-                if (prefs.email_reports.days) {
-                    document.querySelectorAll('.day-cb').forEach(cb => {
-                        cb.checked = prefs.email_reports.days.includes(cb.value);
-                    });
-                }
+                showSelectedDays(orderDaysMondayFirst(prefs.email_reports.days));
             }
 
             if (prefs.email_alerts) {
@@ -241,15 +246,38 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('contract-picker').classList.remove('hidden');
     }
 
-    function setEmailReportsDaysOfTheWeek() {
-        // add email report Days of the Week
-        let daysOfTheWeekStrings = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
-        let daysGrid = document.getElementsByClassName('days-grid')[0];
-
-        daysOfTheWeekStrings.forEach((day, index) => {
-            const dayOfTheWeekHTML = `<label><input type="checkbox" class="day-cb" value=${index}> ${day}</label>`;
-            daysGrid.insertAdjacentHTML('beforeend', dayOfTheWeekHTML);
+    // Native buttons already toggle on Space/Enter and take focus; aria-pressed carries the state.
+    function renderDayPills() {
+        const pills = WEEKDAY_OPTIONS.map((day) => {
+            const pill = document.createElement('button');
+            pill.type = 'button';
+            pill.className = 'day-pill';
+            pill.textContent = day.label;
+            pill.title = day.name;
+            pill.setAttribute('aria-label', day.name);
+            pill.setAttribute('aria-pressed', 'false');
+            pill.dataset.value = day.value;
+            pill.addEventListener('click', () => showSelectedDays(toggleDay(selectedDays, day.value)));
+            return pill;
         });
+        document.getElementById('day-pills').replaceChildren(...pills);
+        return pills;
+    }
+
+    function renderQuickDaySelections() {
+        document.getElementById('quick-days').replaceChildren(...QUICK_DAY_SELECTIONS.map((quick) => {
+            const link = document.createElement('button');
+            link.type = 'button';
+            link.className = 'quick-day';
+            link.textContent = quick.label;
+            link.addEventListener('click', () => showSelectedDays([...quick.days]));
+            return link;
+        }));
+    }
+
+    function showSelectedDays(days) {
+        selectedDays = days;
+        dayPills.forEach((pill) => pill.setAttribute('aria-pressed', String(days.includes(pill.dataset.value))));
     }
 
     function fillNumberOptions(select, values) {

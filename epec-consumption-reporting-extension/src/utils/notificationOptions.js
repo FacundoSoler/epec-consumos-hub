@@ -24,3 +24,32 @@ function range(start, end, step) {
     for (let value = start; value <= end; value += step) values.push(value);
     return values;
 }
+
+// Values follow Date#getDay (Sunday = "0") because the daily report compares against it; the UI lists Monday first.
+export const WEEKDAY_OPTIONS = [
+    { value: '1', label: 'L', name: 'Lunes' },
+    { value: '2', label: 'M', name: 'Martes' },
+    { value: '3', label: 'M', name: 'Miércoles' },
+    { value: '4', label: 'J', name: 'Jueves' },
+    { value: '5', label: 'V', name: 'Viernes' },
+    { value: '6', label: 'S', name: 'Sábado' },
+    { value: '0', label: 'D', name: 'Domingo' }
+];
+
+export const QUICK_DAY_SELECTIONS = [
+    { id: 'all', label: 'Todos', days: ['1', '2', '3', '4', '5', '6', '0'] },
+    { id: 'weekdays', label: 'Hábiles', days: ['1', '2', '3', '4', '5'] },
+    { id: 'none', label: 'Ninguno', days: [] }
+];
+
+export function orderDaysMondayFirst(days) {
+    const selected = new Set((days ?? []).map(String));
+    return WEEKDAY_OPTIONS.map((day) => day.value).filter((value) => selected.has(value));
+}
+
+export function toggleDay(days, value) {
+    const selected = new Set(days);
+    if (selected.has(value)) selected.delete(value);
+    else selected.add(value);
+    return orderDaysMondayFirst([...selected]);
+}

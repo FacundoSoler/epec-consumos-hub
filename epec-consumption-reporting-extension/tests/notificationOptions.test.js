@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
     KWH_LIMIT_OPTIONS,
+    QUICK_DAY_SELECTIONS,
+    WEEKDAY_OPTIONS,
+    orderDaysMondayFirst,
+    toggleDay,
     ROLLING_DAYS_OPTIONS,
     resolveAlertSelection,
     snapToNearestOption
@@ -60,5 +64,47 @@ describe('resolveAlertSelection', () => {
     it('snaps stored values to the dropdown options', () => {
         expect(resolveAlertSelection({ kwh_limit_per_day: 17.5, rolling_days_window: 40 }))
             .toEqual({ kwhLimit: 15, rollingDays: 31 });
+    });
+});
+
+describe('weekday options', () => {
+    it('lists Monday first with Sunday "0" last', () => {
+        expect(WEEKDAY_OPTIONS.map((day) => day.value)).toEqual(['1', '2', '3', '4', '5', '6', '0']);
+        expect(WEEKDAY_OPTIONS.map((day) => day.label).join(' ')).toBe('L M M J V S D');
+        expect(WEEKDAY_OPTIONS.map((day) => day.name))
+            .toEqual(['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']);
+    });
+
+    it('offers Todos, Hábiles and Ninguno quick selections', () => {
+        const byLabel = Object.fromEntries(QUICK_DAY_SELECTIONS.map((quick) => [quick.label, quick.days]));
+        expect(byLabel).toEqual({
+            Todos: ['1', '2', '3', '4', '5', '6', '0'],
+            Hábiles: ['1', '2', '3', '4', '5'],
+            Ninguno: []
+        });
+    });
+});
+
+describe('orderDaysMondayFirst', () => {
+    it('orders stored days Monday first and keeps strings', () => {
+        expect(orderDaysMondayFirst(['0', '3', '1'])).toEqual(['1', '3', '0']);
+    });
+
+    it('accepts numbers, drops unknown values and duplicates', () => {
+        expect(orderDaysMondayFirst([0, '0', 7, 'x', 6])).toEqual(['6', '0']);
+    });
+
+    it('treats a missing list as no days', () => {
+        expect(orderDaysMondayFirst(undefined)).toEqual([]);
+    });
+});
+
+describe('toggleDay', () => {
+    it('adds a missing day in Monday-first order', () => {
+        expect(toggleDay(['1', '0'], '5')).toEqual(['1', '5', '0']);
+    });
+
+    it('removes a selected day', () => {
+        expect(toggleDay(['1', '5', '0'], '0')).toEqual(['1', '5']);
     });
 });

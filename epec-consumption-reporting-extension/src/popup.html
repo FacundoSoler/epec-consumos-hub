@@ -101,18 +101,57 @@
             padding-bottom: 4px;
         }
 
-        .days-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 6px;
-            font-size: 12px;
+        .day-pills {
+            display: flex;
+            gap: 4px;
         }
 
-        .days-grid label {
+        button.day-pill {
+            width: 34px;
+            height: 34px;
+            padding: 0;
+            border-radius: 50%;
+            background: #fff;
+            color: #555;
+            border: 1px solid #ccc;
+            font-weight: bold;
+        }
+
+        button.day-pill:hover {
+            background: #f0f0f0;
+        }
+
+        button.day-pill[aria-pressed="true"] {
+            background: #00875a;
+            border-color: #00875a;
+            color: #fff;
+        }
+
+        button.day-pill:focus-visible,
+        button.quick-day:focus-visible {
+            outline: 2px solid #005c3d;
+            outline-offset: 2px;
+        }
+
+        .quick-days {
             display: flex;
-            align-items: center;
-            gap: 4px;
-            cursor: pointer;
+            gap: 12px;
+            margin-top: 6px;
+        }
+
+        button.quick-day {
+            width: auto;
+            padding: 0;
+            background: none;
+            color: #00875a;
+            font-size: 12px;
+            font-weight: normal;
+            text-decoration: underline;
+        }
+
+        button.quick-day:hover {
+            background: none;
+            color: #006644;
         }
 
         .input-group {
@@ -285,8 +324,8 @@
             </div>
 
             <div id="panel-email" class="settings-panel hidden">
-                <div class="days-grid">
-                </div>
+                <div class="day-pills" id="day-pills" role="group" aria-label="Días de envío"></div>
+                <div class="quick-days" id="quick-days"></div>
             </div>
 
             <div class="toggle-header" style="margin-top: 15px;">
