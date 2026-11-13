@@ -4,7 +4,7 @@ import { fakeRequest, fakeResponse } from '../testing/fakeExpress.js';
 const { sendEmail } = vi.hoisted(() => ({ sendEmail: vi.fn() }));
 vi.mock('../services/emailService.js', () => ({ sendEmail }));
 
-import { handleSendEmail } from './emailController.js';
+import { describeSendFailure, handleSendEmail } from './emailController.js';
 
 const verifiedUser = { email: 'ana@example.com', documento: '30111222' };
 const validBody = { subject: 'Reporte', htmlContent: '<p>hola</p>' };
@@ -81,5 +81,53 @@ describe('handleSendEmail', () => {
 
         expect(res.statusCode).toBe(502);
         expect(res.body).toEqual({ error: 'The email provider rejected the message. Try again later.' });
+    });
+});
+
+describe('send failure logging', () => {
+    function smtpError() {
+        return Object.assign(new Error('Message failed: 550 5.1.1 <ana@example.com> does not exist'), {
+            code: 'EENVELOPE',
+            responseCode: 550,
+            response: '550 5.1.1 <ana@example.com> does not exist\r\n5.1.1 more detail'
+        });
+    }
+
+    it('logs a structured error with the masked recipient and the SMTP code and reply, keeping the 502', async () => {
+        const errorSpy = vi.mocked(console.error);
+        errorSpy.mockClear();
+        sendEmail.mockRejectedValue(smtpError());
+
+        const res = await send(validBody);
+
+        expect(res.statusCode).toBe(502);
+        expect(res.body).toEqual({ error: 'The email provider rejected the message. Try again later.' });
+        expect(errorSpy).toHaveBeenCalledOnce();
+        const line = String(errorSpy.mock.calls[0][0]);
+        expect(JSON.parse(line)).toMatchObject({
+            level: 'error',
+            area: 'email',
+            recipient: 'an•••@example.com',
+            code: 'EENVELOPE',
+            responseCode: 550,
+            response: '550 5.1.1 <an•••@example.com> does not exist'
+        });
+        expect(line).not.toContain('ana@example.com');
+    });
+
+    it('describes a network failure that has only a code and message', () => {
+        const error = Object.assign(new Error('connect ETIMEDOUT 142.250.0.1:465'), { code: 'ETIMEDOUT' });
+
+        expect(describeSendFailure(error, 'ana@example.com')).toEqual({
+            recipient: 'an•••@example.com',
+            code: 'ETIMEDOUT',
+            responseCode: undefined,
+            response: undefined,
+            error: 'connect ETIMEDOUT 142.250.0.1:465'
+        });
+    });
+
+    it('copes with a non-Error rejection', () => {
+        expect(describeSendFailure('boom', 'ana@example.com')).toMatchObject({ recipient: 'an•••@example.com', code: undefined });
     });
 });
