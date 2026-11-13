@@ -37,9 +37,10 @@ Plain JS ES modules bundled by Vite into `dist/`, which is what Chrome loads (se
 | `src/services/emailApi.js` | Shared email POST: 15 s timeout, classifies the answer into an outcome. |
 | `src/utils/maskEmail.js`, `src/utils/emailStatusText.js` | Masked recipient (`fa*****@domain`) and the popup's Spanish email-status lines. |
 | `src/storage/*` | Storage keys and getters (`getEpecUser`, `getBearerToken`, `getContractId` for the selected contract, `isSessionExpired`) and `resolveSelectedContract`. |
+| `src/utils/notificationOptions.js` | Notifications tab choices: dropdown options, nearest-option snapping for stored values, weekday pills and quick selections, and the stored preferences object built from the controls. |
 | `src/utils/consumptionMetrics.js` | `toKwh()` (numbers or `"12,4"` strings) and `summarizeConsumption()` (total, average, 28-day projection), shared by the popup and the email report. |
 | `src/utils/logger.js`, `src/utils/html.js`, `src/utils/utils.js` | Structured JSON logger, HTML escaping for email bodies, Córdoba date helpers. |
-| `src/popup.*` | Reports tab (total, daily average, 28-day projection, daily list, last report/alert email status), contract picker when the user has several contracts, session-expired banner, and Notifications tab (report weekdays, alert limit and window). |
+| `src/popup.*` | Reports tab (total, daily average, 28-day projection, daily list, last report/alert email status), contract picker when the user has several contracts, session-expired banner, and Notifications tab, which saves each change immediately (report weekdays as Monday-first pills with Todos/Hábiles/Ninguno, alert limit 5–50 kWh and window 1–31 days as dropdowns; a per-section "Guardado ✓" or red error). |
 
 Storage keys: `epecUser`, `consumptionData`, `lastUpdated`, `notificationPrefs`, `lastReportSentOn`, `lastAlertSentOn`, `sessionExpired`, `selectedContractId`, `lastEmailStatus` (`{ report, alert }`, the latest outcome of each email, shown in the popup), `lastRefreshError` (`no-data`, `epec-error` or `session-expired` after a failed refresh, which also clears `lastEmailStatus` so the popup shows one red line instead of email lines; null after a successful refresh).
 
