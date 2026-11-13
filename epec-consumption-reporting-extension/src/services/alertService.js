@@ -4,8 +4,11 @@ import { getCordobaDateKey } from '../utils/utils.js';
 import { toKwh } from '../utils/consumptionMetrics.js';
 import { escapeHtml } from '../utils/html.js';
 import { createLogger } from '../utils/logger.js';
+import { maskEmail } from '../utils/maskEmail.js';
+import { createEmailOutcome, postEmailRequest } from './emailApi.js';
 
 const log = createLogger('alerts');
+const KIND = 'alert';
 
 /**
  * @typedef {Object} AlertThreshold
@@ -46,9 +49,12 @@ export function evaluateThresholdAlert(readings, threshold) {
 /**
  * Asks the server to email a threshold alert when the rolling average exceeds the user's limit,
  * at most once per Córdoba day. Runs after each data refresh, like the daily report.
+ * @param {string} apiBaseUrl
+ * @returns {Promise<import('./emailApi.js').EmailOutcome>}
  */
 export async function sendThresholdAlertIfDue(apiBaseUrl) {
     const stored = await chrome.storage.local.get([
+        localStorageKeys.EPEC_USER,
         localStorageKeys.NOTIFICATION_PREFERENCES,
         localStorageKeys.CONSUMPTION_DATA,
         localStorageKeys.LAST_ALERT_SENT_ON,
@@ -58,41 +64,41 @@ export async function sendThresholdAlertIfDue(apiBaseUrl) {
     const today = getCordobaDateKey();
     const alertPrefs = stored[localStorageKeys.NOTIFICATION_PREFERENCES]?.email_alerts;
     const consumptionData = stored[localStorageKeys.CONSUMPTION_DATA];
+    const recipient = maskEmail(stored[localStorageKeys.EPEC_USER]?.email);
+    const skip = (reason, details) => createEmailOutcome(KIND, 'skipped', reason, details ? { details } : {});
 
     // The server would reject the expired token anyway; skipping avoids a pointless failing call.
-    if (stored[localStorageKeys.SESSION_EXPIRED] === true) return;
-    if (!alertPrefs?.enabled) return;
+    if (stored[localStorageKeys.SESSION_EXPIRED] === true) return skip('session-expired');
+    if (!alertPrefs?.enabled) return skip('disabled');
     if (!isValidThreshold(alertPrefs.threshold)) {
         // Only reachable with preferences saved before validation existed; the values themselves stay out of logs.
         log.warn('Stored alert threshold is invalid; alerts skipped until it is saved again');
-        return;
+        return skip('invalid-threshold');
     }
-    if (stored[localStorageKeys.LAST_ALERT_SENT_ON] === today) return;
-    if (!Array.isArray(consumptionData)) return;
+    if (stored[localStorageKeys.LAST_ALERT_SENT_ON] === today) {
+        return createEmailOutcome(KIND, 'already-sent', 'already-sent-locally', { recipient });
+    }
+    // Fewer readings than the window never alert (see evaluateThresholdAlert), so there is no average to report yet.
+    if (!Array.isArray(consumptionData) || consumptionData.length === 0
+        || consumptionData.length < alertPrefs.threshold.rolling_days_window) return skip('no-data');
 
     const evaluation = evaluateThresholdAlert(consumptionData, alertPrefs.threshold);
-    if (!evaluation.exceeded) return;
+    const details = { average: evaluation.average, limit: evaluation.limit, windowDays: evaluation.windowDays };
+    if (!evaluation.exceeded) return skip('below-threshold', details);
 
     const epecUser = await store.getEpecUser();
-    const response = await fetch(`${apiBaseUrl}/email/sendEmailAlert`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${epecUser.token}`
-        },
-        body: JSON.stringify({
-            subject: `Alerta de consumo eléctrico - ${epecUser.nombre}`,
-            htmlContent: buildThresholdAlertHtml(epecUser.nombre, evaluation)
-        })
+    const { result, reason, ...fields } = await postEmailRequest({
+        apiBaseUrl,
+        path: '/email/sendEmailAlert',
+        token: epecUser.token,
+        subject: `Alerta de consumo eléctrico - ${epecUser.nombre}`,
+        htmlContent: buildThresholdAlertHtml(epecUser.nombre, evaluation)
     });
 
-    // 429 means the server already sent today's alert (e.g. from another device).
-    if (response.ok || response.status === 429) {
+    if (result === 'sent' || result === 'already-sent') {
         await chrome.storage.local.set({ [localStorageKeys.LAST_ALERT_SENT_ON]: today });
-        return;
     }
-
-    throw new Error(`Threshold alert request failed with status ${response.status}`);
+    return createEmailOutcome(KIND, result, reason, { ...fields, details: { ...details, ...fields.details }, recipient });
 }
 
 /**

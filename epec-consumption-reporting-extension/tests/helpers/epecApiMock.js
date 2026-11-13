@@ -27,7 +27,8 @@ export function mockEpecApi({
         if (url.includes('CONSUMO_DIARIO')) return jsonResponse(readingsFor(url, readingsByContract) ?? readings);
         if (url.includes('/consumos/tipo-medicion')) return jsonResponse(period);
         if (url.includes('/usuarios/contratos')) return jsonResponse(contracts);
-        return jsonResponse({}, serverStatus);
+        // The real server answers {status:'sent'} on success, which the extension requires before recording the day.
+        return jsonResponse(serverStatus === 200 ? { status: 'sent' } : {}, serverStatus);
     });
 
     vi.stubGlobal('fetch', fetchMock);

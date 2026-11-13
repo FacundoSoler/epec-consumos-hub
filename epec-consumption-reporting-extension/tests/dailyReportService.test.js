@@ -11,15 +11,15 @@ const readings = [
     { fechaHora: '10/11/2026', consumo: 10.5, dateSorting: 1 }
 ];
 
-function setup({ prefs = { email_reports: { enabled: true, days: ['4'] } }, storage = {}, status = 200 } = {}) {
+function setup({ prefs = { email_reports: { enabled: true, days: ['4'] } }, storage = {}, status = 200, body = { status: 'sent' } } = {}) {
     const mock = createChromeMock({
-        epecUser: { nombre: 'Ana', token: 'tok' },
+        epecUser: { nombre: 'Ana', token: 'tok', email: 'ana.paz@example.com' },
         notificationPrefs: prefs,
         consumptionData: readings,
         ...storage
     });
     vi.stubGlobal('chrome', mock.chrome);
-    const fetchMock = vi.fn().mockResolvedValue({ ok: status < 400, status });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: status >= 200 && status < 300, status, json: async () => body });
     vi.stubGlobal('fetch', fetchMock);
     return { mock, fetchMock };
 }
@@ -50,19 +50,28 @@ describe('sendDailyReportIfDue', () => {
     });
 
     it.each([
-        ['reports are disabled', { prefs: { email_reports: { enabled: false, days: ['4'] } } }],
-        ['no preferences were saved', { prefs: null }],
-        ['today is not a selected day', { prefs: { email_reports: { enabled: true, days: ['1', '3'] } } }],
-        ['no days are selected', { prefs: { email_reports: { enabled: true, days: [] } } }],
-        ['it was already sent today', { storage: { lastReportSentOn: '2026-11-12' } }],
-        ['there is no consumption data yet', { storage: { consumptionData: [] } }],
-        ['the EPEC session expired', { storage: { sessionExpired: true } }]
-    ])('does nothing when %s', async (_label, options) => {
+        ['reports are disabled', 'disabled', { prefs: { email_reports: { enabled: false, days: ['4'] } } }],
+        ['no preferences were saved', 'disabled', { prefs: null }],
+        ['today is not a selected day', 'not-today', { prefs: { email_reports: { enabled: true, days: ['1', '3'] } } }],
+        ['no days are selected', 'not-today', { prefs: { email_reports: { enabled: true, days: [] } } }],
+        ['there is no consumption data yet', 'no-data', { storage: { consumptionData: [] } }],
+        ['the EPEC session expired', 'session-expired', { storage: { sessionExpired: true } }]
+    ])('skips without calling the server when %s', async (_label, reason, options) => {
         const { fetchMock } = setup(options);
 
-        await sendDailyReportIfDue(API);
+        const outcome = await sendDailyReportIfDue(API);
 
         expect(fetchMock).not.toHaveBeenCalled();
+        expect(outcome).toEqual({ kind: 'report', result: 'skipped', reason, at: THURSDAY_MORNING.toISOString() });
+    });
+
+    it('reports already-sent without calling the server when today is already recorded', async () => {
+        const { fetchMock } = setup({ storage: { lastReportSentOn: '2026-11-12' } });
+
+        const outcome = await sendDailyReportIfDue(API);
+
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(outcome).toMatchObject({ result: 'already-sent', reason: 'already-sent-locally', recipient: 'an•••@example.com' });
     });
 
     it('sends again on a new day after yesterday’s report', async () => {
@@ -73,18 +82,70 @@ describe('sendDailyReportIfDue', () => {
         expect(fetchMock).toHaveBeenCalledOnce();
     });
 
-    it('treats 429 (already sent, e.g. from another device) as sent', async () => {
-        const { mock } = setup({ status: 429 });
+    it('returns a sent outcome with the masked recipient and server, never the full address', async () => {
+        setup();
 
-        await sendDailyReportIfDue(API);
+        const outcome = await sendDailyReportIfDue(API);
 
+        expect(outcome).toEqual({
+            kind: 'report', result: 'sent', reason: 'sent', status: 200, at: THURSDAY_MORNING.toISOString(),
+            server: 'http://localhost:3000', recipient: 'an•••@example.com'
+        });
+        expect(JSON.stringify(outcome)).not.toContain('ana.paz@');
+    });
+
+    it('treats 429 (already sent, e.g. from another device) as already-sent and records the day', async () => {
+        const { mock } = setup({ status: 429, body: {} });
+
+        const outcome = await sendDailyReportIfDue(API);
+
+        expect(outcome).toMatchObject({ result: 'already-sent', status: 429 });
         expect(mock.storage.lastReportSentOn).toBe('2026-11-12');
     });
 
-    it.each([401, 500, 502])('throws on %i and leaves the day unsent so it retries', async (status) => {
-        const { mock } = setup({ status });
+    it.each([
+        [200, {}, 'unexpected-response'],
+        [400, { error: 'subject is required.' }, 'invalid-data'],
+        [401, {}, 'session-rejected'],
+        [403, {}, 'session-rejected'],
+        [500, {}, 'server-error'],
+        [502, {}, 'server-error'],
+        [503, {}, 'server-error']
+    ])('returns failed on %i and leaves the day unsent so it retries', async (status, body, reason) => {
+        const { mock } = setup({ status, body });
 
-        await expect(sendDailyReportIfDue(API)).rejects.toThrow(`status ${status}`);
+        const outcome = await sendDailyReportIfDue(API);
+
+        expect(outcome).toMatchObject({ kind: 'report', result: 'failed', reason, status });
+        expect(mock.storage.lastReportSentOn).toBeUndefined();
+    });
+
+    it('passes the server validation message along for invalid data', async () => {
+        setup({ status: 400, body: { error: 'subject is required.' } });
+
+        expect((await sendDailyReportIfDue(API)).details).toEqual({ serverMessage: 'subject is required.' });
+    });
+
+    it('never records the day when the server is unreachable', async () => {
+        const { mock, fetchMock } = setup();
+        fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
+
+        const outcome = await sendDailyReportIfDue(API);
+
+        expect(outcome).toMatchObject({ result: 'failed', reason: 'server-unreachable', server: 'http://localhost:3000' });
+        expect(mock.storage.lastReportSentOn).toBeUndefined();
+    });
+
+    it('never records the day when the request times out', async () => {
+        const { mock, fetchMock } = setup();
+        fetchMock.mockImplementation((_url, { signal }) => new Promise((_resolve, reject) => {
+            signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+        }));
+
+        const pending = sendDailyReportIfDue(API);
+        await vi.advanceTimersByTimeAsync(15_000);
+
+        expect(await pending).toMatchObject({ result: 'failed', reason: 'timeout' });
         expect(mock.storage.lastReportSentOn).toBeUndefined();
     });
 

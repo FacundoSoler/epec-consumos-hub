@@ -20,15 +20,15 @@ const readings = [
 
 const alertPrefs = (threshold, enabled = true) => ({ email_alerts: { enabled, threshold } });
 
-function setup({ prefs = alertPrefs({ kwh_limit_per_day: 19, rolling_days_window: 3 }), storage = {}, status = 200 } = {}) {
+function setup({ prefs = alertPrefs({ kwh_limit_per_day: 19, rolling_days_window: 3 }), storage = {}, status = 200, body = { status: 'sent' } } = {}) {
     const mock = createChromeMock({
-        epecUser: { nombre: 'Ana', token: 'tok' },
+        epecUser: { nombre: 'Ana', token: 'tok', email: 'ana.paz@example.com' },
         notificationPrefs: prefs,
         consumptionData: readings,
         ...storage
     });
     vi.stubGlobal('chrome', mock.chrome);
-    const fetchMock = vi.fn().mockResolvedValue({ ok: status < 400, status });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: status >= 200 && status < 300, status, json: async () => body });
     vi.stubGlobal('fetch', fetchMock);
     return { mock, fetchMock };
 }
@@ -102,19 +102,37 @@ describe('sendThresholdAlertIfDue', () => {
     });
 
     it.each([
-        ['alerts are disabled', { prefs: alertPrefs({ kwh_limit_per_day: 19, rolling_days_window: 3 }, false) }],
-        ['no preferences were saved', { prefs: null }],
-        ['the saved threshold is invalid', { prefs: alertPrefs({ kwh_limit_per_day: 0, rolling_days_window: 3 }) }],
-        ['the limit is not exceeded', { prefs: alertPrefs({ kwh_limit_per_day: 20, rolling_days_window: 3 }) }],
-        ['it was already sent today', { storage: { lastAlertSentOn: '2026-11-12' } }],
-        ['there is no consumption data yet', { storage: { consumptionData: [] } }],
-        ['the EPEC session expired', { storage: { sessionExpired: true } }]
-    ])('does nothing when %s', async (_label, options) => {
+        ['alerts are disabled', 'disabled', { prefs: alertPrefs({ kwh_limit_per_day: 19, rolling_days_window: 3 }, false) }],
+        ['no preferences were saved', 'disabled', { prefs: null }],
+        ['the saved threshold is invalid', 'invalid-threshold', { prefs: alertPrefs({ kwh_limit_per_day: 0, rolling_days_window: 3 }) }],
+        ['there is no consumption data yet', 'no-data', { storage: { consumptionData: [] } }],
+        ['there are fewer readings than the window', 'no-data', { prefs: alertPrefs({ kwh_limit_per_day: 1, rolling_days_window: 5 }) }],
+        ['the EPEC session expired', 'session-expired', { storage: { sessionExpired: true } }]
+    ])('skips without calling the server when %s', async (_label, reason, options) => {
         const { fetchMock } = setup(options);
 
-        await sendThresholdAlertIfDue(API);
+        const outcome = await sendThresholdAlertIfDue(API);
 
         expect(fetchMock).not.toHaveBeenCalled();
+        expect(outcome).toEqual({ kind: 'alert', result: 'skipped', reason, at: THURSDAY_MORNING.toISOString() });
+    });
+
+    it('skips below the limit and reports the average, limit and window', async () => {
+        const { fetchMock } = setup({ prefs: alertPrefs({ kwh_limit_per_day: 20, rolling_days_window: 3 }) });
+
+        const outcome = await sendThresholdAlertIfDue(API);
+
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(outcome).toMatchObject({ result: 'skipped', reason: 'below-threshold', details: { average: 20, limit: 20, windowDays: 3 } });
+    });
+
+    it('reports already-sent without calling the server when today is already recorded', async () => {
+        const { fetchMock } = setup({ storage: { lastAlertSentOn: '2026-11-12' } });
+
+        const outcome = await sendThresholdAlertIfDue(API);
+
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(outcome).toMatchObject({ result: 'already-sent', reason: 'already-sent-locally', recipient: 'an•••@example.com' });
     });
 
     it('logs one warning without the threshold values when the stored threshold is invalid', async () => {
@@ -148,18 +166,61 @@ describe('sendThresholdAlertIfDue', () => {
         expect(fetchMock).toHaveBeenCalledOnce();
     });
 
-    it('treats 429 (already sent today) as sent', async () => {
-        const { mock } = setup({ status: 429 });
+    it('returns a sent outcome with the masked recipient and the evaluation', async () => {
+        setup();
 
-        await sendThresholdAlertIfDue(API);
+        expect(await sendThresholdAlertIfDue(API)).toMatchObject({
+            kind: 'alert', result: 'sent', status: 200, recipient: 'an•••@example.com',
+            details: { average: 20, limit: 19, windowDays: 3 }
+        });
+    });
 
+    it('treats 429 (already sent today) as already-sent and records the day', async () => {
+        const { mock } = setup({ status: 429, body: {} });
+
+        expect(await sendThresholdAlertIfDue(API)).toMatchObject({ result: 'already-sent' });
         expect(mock.storage.lastAlertSentOn).toBe('2026-11-12');
     });
 
-    it.each([401, 500])('throws on %i and leaves the day unsent so it retries', async (status) => {
-        const { mock } = setup({ status });
+    it.each([
+        [200, {}, 'unexpected-response'],
+        [400, { error: 'htmlContent is required.' }, 'invalid-data'],
+        [401, {}, 'session-rejected'],
+        [403, {}, 'session-rejected'],
+        [500, {}, 'server-error'],
+        [503, {}, 'server-error']
+    ])('returns failed on %i and leaves the day unsent so it retries', async (status, body, reason) => {
+        const { mock } = setup({ status, body });
 
-        await expect(sendThresholdAlertIfDue(API)).rejects.toThrow(`status ${status}`);
+        expect(await sendThresholdAlertIfDue(API)).toMatchObject({ kind: 'alert', result: 'failed', reason, status });
+        expect(mock.storage.lastAlertSentOn).toBeUndefined();
+    });
+
+    it('keeps the evaluation and adds the server validation message for invalid data', async () => {
+        setup({ status: 400, body: { error: 'htmlContent is required.' } });
+
+        expect((await sendThresholdAlertIfDue(API)).details)
+            .toEqual({ average: 20, limit: 19, windowDays: 3, serverMessage: 'htmlContent is required.' });
+    });
+
+    it('never records the day when the server is unreachable', async () => {
+        const { mock, fetchMock } = setup();
+        fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
+
+        expect(await sendThresholdAlertIfDue(API)).toMatchObject({ result: 'failed', reason: 'server-unreachable' });
+        expect(mock.storage.lastAlertSentOn).toBeUndefined();
+    });
+
+    it('never records the day when the request times out', async () => {
+        const { mock, fetchMock } = setup();
+        fetchMock.mockImplementation((_url, { signal }) => new Promise((_resolve, reject) => {
+            signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+        }));
+
+        const pending = sendThresholdAlertIfDue(API);
+        await vi.advanceTimersByTimeAsync(15_000);
+
+        expect(await pending).toMatchObject({ result: 'failed', reason: 'timeout' });
         expect(mock.storage.lastAlertSentOn).toBeUndefined();
     });
 });
