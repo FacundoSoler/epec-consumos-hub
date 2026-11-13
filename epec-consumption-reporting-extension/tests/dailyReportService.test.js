@@ -71,7 +71,7 @@ describe('sendDailyReportIfDue', () => {
         const outcome = await sendDailyReportIfDue(API);
 
         expect(fetchMock).not.toHaveBeenCalled();
-        expect(outcome).toMatchObject({ result: 'already-sent', reason: 'already-sent-locally', recipient: 'an•••@example.com' });
+        expect(outcome).toMatchObject({ result: 'already-sent', reason: 'already-sent-locally', recipient: 'an*****@example.com' });
     });
 
     it('sends again on a new day after yesterday’s report', async () => {
@@ -89,7 +89,7 @@ describe('sendDailyReportIfDue', () => {
 
         expect(outcome).toEqual({
             kind: 'report', result: 'sent', reason: 'sent', status: 200, at: THURSDAY_MORNING.toISOString(),
-            server: 'http://localhost:3000', recipient: 'an•••@example.com'
+            server: 'http://localhost:3000', recipient: 'an*****@example.com'
         });
         expect(JSON.stringify(outcome)).not.toContain('ana.paz@');
     });

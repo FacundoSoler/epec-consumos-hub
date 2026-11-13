@@ -1,8 +1,7 @@
-const MASK = '•••';
 const VISIBLE_LOCAL_CHARS = 2;
 
 /**
- * "fa•••@hotmail.com": enough for users to recognise their own address in the popup while a
+ * "fa*****@hotmail.com": enough for users to recognise their own address in the popup while a
  * screenshot or log line never exposes it. Short local parts keep at least one character hidden.
  * @param {unknown} email
  * @returns {string | null} null when there is no usable address
@@ -17,5 +16,5 @@ export function maskEmail(email) {
     if (atIndex < 1 || domain === '') return null;
 
     const visibleChars = Math.min(VISIBLE_LOCAL_CHARS, localPart.length - 1);
-    return `${localPart.slice(0, visibleChars)}${MASK}@${domain}`;
+    return `${localPart.slice(0, visibleChars)}${'*'.repeat(localPart.length - visibleChars)}@${domain}`;
 }

@@ -221,7 +221,7 @@ describe('email status', () => {
         const response = await mock.dispatch({ action: 'refreshData' });
 
         expect(response.success).toBe(true);
-        expect(response.emailStatus.report).toMatchObject({ kind: 'report', result: 'sent', recipient: 'an•••@example.com' });
+        expect(response.emailStatus.report).toMatchObject({ kind: 'report', result: 'sent', recipient: 'an*@example.com' });
         expect(response.emailStatus.alert).toMatchObject({ kind: 'alert', result: 'sent' });
         expect(mock.storage.lastEmailStatus).toEqual(response.emailStatus);
     });
@@ -278,7 +278,7 @@ describe('email status', () => {
         const failure = lines.map((line) => JSON.parse(line)).find((entry) => entry.message === 'Email not sent');
         expect(failure).toMatchObject({ level: 'error', area: 'email', kind: 'report', result: 'failed', reason: 'server-error', status: 503 });
         expect(lines.join('\n')).not.toContain('ana@example.com');
-        expect(lines.join('\n')).not.toContain('an•••');
+        expect(lines.join('\n')).not.toContain('an*@');
         expect(lines.join('\n')).not.toContain('tok"');
     });
 

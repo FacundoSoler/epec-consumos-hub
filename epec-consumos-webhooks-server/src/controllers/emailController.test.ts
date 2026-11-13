@@ -107,10 +107,10 @@ describe('send failure logging', () => {
         expect(JSON.parse(line)).toMatchObject({
             level: 'error',
             area: 'email',
-            recipient: 'an•••@example.com',
+            recipient: 'an*@example.com',
             code: 'EENVELOPE',
             responseCode: 550,
-            response: '550 5.1.1 <an•••@example.com> does not exist'
+            response: '550 5.1.1 <an*@example.com> does not exist'
         });
         expect(line).not.toContain('ana@example.com');
     });
@@ -119,7 +119,7 @@ describe('send failure logging', () => {
         const error = Object.assign(new Error('connect ETIMEDOUT 142.250.0.1:465'), { code: 'ETIMEDOUT' });
 
         expect(describeSendFailure(error, 'ana@example.com')).toEqual({
-            recipient: 'an•••@example.com',
+            recipient: 'an*@example.com',
             code: 'ETIMEDOUT',
             responseCode: undefined,
             response: undefined,
@@ -128,6 +128,6 @@ describe('send failure logging', () => {
     });
 
     it('copes with a non-Error rejection', () => {
-        expect(describeSendFailure('boom', 'ana@example.com')).toMatchObject({ recipient: 'an•••@example.com', code: undefined });
+        expect(describeSendFailure('boom', 'ana@example.com')).toMatchObject({ recipient: 'an*@example.com', code: undefined });
     });
 });

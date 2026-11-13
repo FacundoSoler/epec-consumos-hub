@@ -132,7 +132,7 @@ describe('sendThresholdAlertIfDue', () => {
         const outcome = await sendThresholdAlertIfDue(API);
 
         expect(fetchMock).not.toHaveBeenCalled();
-        expect(outcome).toMatchObject({ result: 'already-sent', reason: 'already-sent-locally', recipient: 'an•••@example.com' });
+        expect(outcome).toMatchObject({ result: 'already-sent', reason: 'already-sent-locally', recipient: 'an*****@example.com' });
     });
 
     it('logs one warning without the threshold values when the stored threshold is invalid', async () => {
@@ -170,7 +170,7 @@ describe('sendThresholdAlertIfDue', () => {
         setup();
 
         expect(await sendThresholdAlertIfDue(API)).toMatchObject({
-            kind: 'alert', result: 'sent', status: 200, recipient: 'an•••@example.com',
+            kind: 'alert', result: 'sent', status: 200, recipient: 'an*****@example.com',
             details: { average: 20, limit: 19, windowDays: 3 }
         });
     });

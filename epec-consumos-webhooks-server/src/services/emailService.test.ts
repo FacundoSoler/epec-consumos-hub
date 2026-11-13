@@ -52,7 +52,7 @@ describe('sendEmail', () => {
         const output = lines.at(-1) ?? '';
         const entry = JSON.parse(output);
         expect(entry).toMatchObject({ level: 'info', area: 'email' });
-        expect(entry.message).toBe('Email sent to fa•••@hotmail.com (Gmail message id <id-42@gmail.com>)');
+        expect(entry.message).toBe('Email sent to fa*****@hotmail.com (Gmail message id <id-42@gmail.com>)');
         expect(lines.join(' ')).not.toContain('facundo@');
     });
 

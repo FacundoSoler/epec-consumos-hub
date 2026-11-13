@@ -35,7 +35,7 @@ Plain JS ES modules bundled by Vite into `dist/`, which is what Chrome loads (se
 | `src/services/alertService.js` | Evaluates the rolling-average threshold and asks the server for an alert. |
 | `src/services/sessionService.js` | Marks the session expired when EPEC rejects the stored token (badge + popup banner, emails paused) and clears it after a successful refresh or login. |
 | `src/services/emailApi.js` | Shared email POST: 15 s timeout, classifies the answer into an outcome. |
-| `src/utils/maskEmail.js`, `src/utils/emailStatusText.js` | Masked recipient (`fa•••@domain`) and the popup's Spanish email-status lines. |
+| `src/utils/maskEmail.js`, `src/utils/emailStatusText.js` | Masked recipient (`fa*****@domain`) and the popup's Spanish email-status lines. |
 | `src/storage/*` | Storage keys and getters (`getEpecUser`, `getBearerToken`, `getContractId` for the selected contract, `isSessionExpired`) and `resolveSelectedContract`. |
 | `src/utils/consumptionMetrics.js` | `toKwh()` (numbers or `"12,4"` strings) and `summarizeConsumption()` (total, average, 28-day projection), shared by the popup and the email report. |
 | `src/utils/logger.js`, `src/utils/html.js`, `src/utils/utils.js` | Structured JSON logger, HTML escaping for email bodies, Córdoba date helpers. |
@@ -58,7 +58,7 @@ services/epecAPIservice.ts          getContratos(), used as the token check
 services/dailyRateLimiter.ts        in-memory limiter
 config.ts                           getPort(): PORT from env, 3000 fallback
 listenResult.ts                     logs 'running', or logs the listen error (EACCES/EADDRINUSE) and exits 1
-maskEmail.ts                        fa•••@domain for the email success and failure log lines
+maskEmail.ts                        fa*****@domain for the email success and failure log lines
 logger.ts                           structured JSON logger, hashUser() for DNIs, LOG_HASH_SECRET check
 ```
 
@@ -130,7 +130,7 @@ sequenceDiagram
 | `failed` | `server-unreachable` (fetch threw), `timeout` (15 s abort), `session-rejected` (401/403), `invalid-data` (400, server message in `details`), `server-error` (other status), `unexpected-response` (200 without `{status:"sent"}`), `unexpected-error` (bug or storage error) | no, retried on the next refresh |
 | `skipped` | `disabled`, `not-today`, `no-data`, `session-expired`; alerts also `invalid-threshold`, `below-threshold` (average/limit/window in `details`) | no |
 
-`recipient` is the EPEC user's email masked as `fa•••@domain` (the server sends to the same address, taken from the token). Logs carry only kind, result, reason and status.
+`recipient` is the EPEC user's email masked as `fa*****@domain` (the server sends to the same address, taken from the token). Logs carry only kind, result, reason and status.
 
 **Server start.** Express 5 reports listen failures to the `app.listen` callback; `handleListenResult` logs the port and code (EACCES: port reserved or not permitted, EADDRINUSE: port already in use) and exits 1, and only logs "running" on success.
 

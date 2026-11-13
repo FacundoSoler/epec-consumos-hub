@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildEmailStatusLine, formatKwh } from '../src/utils/emailStatusText.js';
 
 const at = new Date(2026, 10, 12, 9, 5).toISOString();
-const recipient = 'fa•••@hotmail.com';
+const recipient = 'fa*****@hotmail.com';
 const server = 'http://localhost:3000';
 const outcome = (kind, result, reason, fields = {}) => ({ kind, result, reason, at, ...fields });
 const textOf = (...args) => buildEmailStatusLine(outcome(...args)).text;
@@ -11,14 +11,14 @@ describe('buildEmailStatusLine: daily report', () => {
     it('sent', () => {
         expect(buildEmailStatusLine(outcome('report', 'sent', 'sent', { recipient, status: 200 }))).toEqual({
             tone: 'success',
-            text: '✅ Reporte diario enviado por email a fa•••@hotmail.com (usuario EPEC) a las 09:05.'
+            text: '✅ Reporte diario enviado por email a fa*****@hotmail.com (usuario EPEC) a las 09:05.'
         });
     });
 
     it.each(['already-sent', 'already-sent-locally'])('already-sent (%s)', (reason) => {
         expect(buildEmailStatusLine(outcome('report', 'already-sent', reason, { recipient }))).toEqual({
             tone: 'success',
-            text: '✅ El reporte diario de hoy ya fue enviado por email a fa•••@hotmail.com (usuario EPEC). El próximo se envía el siguiente día seleccionado.'
+            text: '✅ El reporte diario de hoy ya fue enviado por email a fa*****@hotmail.com (usuario EPEC). El próximo se envía el siguiente día seleccionado.'
         });
     });
 
@@ -71,17 +71,17 @@ describe('buildEmailStatusLine: daily report', () => {
 describe('buildEmailStatusLine: threshold alert', () => {
     it('sent, with comma decimals', () => {
         expect(textOf('alert', 'sent', 'sent', { recipient, details: { average: 22.46, limit: 20, windowDays: 3 } }))
-            .toBe('✅ Alerta de consumo enviada por email a fa•••@hotmail.com (usuario EPEC): promedio 22,5 kWh/día en los últimos 3 días, límite 20 kWh/día.');
+            .toBe('✅ Alerta de consumo enviada por email a fa*****@hotmail.com (usuario EPEC): promedio 22,5 kWh/día en los últimos 3 días, límite 20 kWh/día.');
     });
 
     it('sent with a one-day window uses the singular', () => {
         expect(textOf('alert', 'sent', 'sent', { recipient, details: { average: 30, limit: 12.5, windowDays: 1 } }))
-            .toBe('✅ Alerta de consumo enviada por email a fa•••@hotmail.com (usuario EPEC): promedio 30 kWh/día en el último día, límite 12,5 kWh/día.');
+            .toBe('✅ Alerta de consumo enviada por email a fa*****@hotmail.com (usuario EPEC): promedio 30 kWh/día en el último día, límite 12,5 kWh/día.');
     });
 
     it('already-sent', () => {
         expect(textOf('alert', 'already-sent', 'already-sent', { recipient }))
-            .toBe('✅ La alerta de consumo de hoy ya fue enviada por email a fa•••@hotmail.com (usuario EPEC).');
+            .toBe('✅ La alerta de consumo de hoy ya fue enviada por email a fa*****@hotmail.com (usuario EPEC).');
     });
 
     it('failures name the alert with its article', () => {

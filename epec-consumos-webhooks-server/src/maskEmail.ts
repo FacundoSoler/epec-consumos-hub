@@ -1,8 +1,7 @@
-const MASK = '•••';
 const VISIBLE_LOCAL_CHARS = 2;
 
 /**
- * "fa•••@hotmail.com": enough to tell recipients apart in Railway logs without storing their address.
+ * "fa*****@hotmail.com": enough to tell recipients apart in Railway logs without storing their address.
  * Mirrors the extension's maskEmail so the popup and the logs show the same form.
  * Short local parts keep at least one character hidden; unusable input yields null.
  */
@@ -16,5 +15,5 @@ export function maskEmail(email: unknown): string | null {
     if (atIndex < 1 || domain === '') return null;
 
     const visibleChars = Math.min(VISIBLE_LOCAL_CHARS, localPart.length - 1);
-    return `${localPart.slice(0, visibleChars)}${MASK}@${domain}`;
+    return `${localPart.slice(0, visibleChars)}${'*'.repeat(localPart.length - visibleChars)}@${domain}`;
 }
