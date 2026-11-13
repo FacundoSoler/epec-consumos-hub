@@ -5,6 +5,7 @@ import cors from 'cors';
 import emailRoutes from './routes/emailRoutes.js';
 import { getPort } from './config.js';
 import { getLogHashSecret } from './logger.js';
+import { handleListenResult } from './listenResult.js';
 
 getLogHashSecret();
 
@@ -17,6 +18,4 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use('/api/email', emailRoutes);
 
-app.listen(PORT, () => {
-    console.log(`🚀 Local Express server running on http://localhost:${PORT}`);
-});
+app.listen(PORT, (error) => handleListenResult(PORT, error));
