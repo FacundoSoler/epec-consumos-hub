@@ -71,12 +71,12 @@ describe('buildEmailStatusLine: daily report', () => {
 describe('buildEmailStatusLine: threshold alert', () => {
     it('sent, with comma decimals', () => {
         expect(textOf('alert', 'sent', 'sent', { recipient, details: { average: 22.46, limit: 20, windowDays: 3 } }))
-            .toBe('✅ Alerta de consumo enviada por email a fa•••@hotmail.com (usuario EPEC): promedio 22,5 kWh/día en los últimos 3 días, límite 20.');
+            .toBe('✅ Alerta de consumo enviada por email a fa•••@hotmail.com (usuario EPEC): promedio 22,5 kWh/día en los últimos 3 días, límite 20 kWh/día.');
     });
 
     it('sent with a one-day window uses the singular', () => {
         expect(textOf('alert', 'sent', 'sent', { recipient, details: { average: 30, limit: 12.5, windowDays: 1 } }))
-            .toBe('✅ Alerta de consumo enviada por email a fa•••@hotmail.com (usuario EPEC): promedio 30 kWh/día en el último día, límite 12,5.');
+            .toBe('✅ Alerta de consumo enviada por email a fa•••@hotmail.com (usuario EPEC): promedio 30 kWh/día en el último día, límite 12,5 kWh/día.');
     });
 
     it('already-sent', () => {
@@ -95,7 +95,7 @@ describe('buildEmailStatusLine: threshold alert', () => {
 
     it('skipped below-threshold', () => {
         expect(textOf('alert', 'skipped', 'below-threshold', { details: { average: 18.04, limit: 20.5, windowDays: 3 } }))
-            .toBe('ℹ️ Alerta de consumo: el promedio (18 kWh/día) está por debajo del límite (20,5). No se envió email.');
+            .toBe('ℹ️ Alerta de consumo: el promedio (18 kWh/día) está por debajo del límite (20,5 kWh/día). No se envió email.');
     });
 
     it('skipped invalid-threshold', () => {

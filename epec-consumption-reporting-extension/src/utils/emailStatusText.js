@@ -56,7 +56,7 @@ function buildSentText(subject, outcome) {
     const destination = describeRecipient(outcome.recipient);
     if (outcome.kind === 'alert' && outcome.details) {
         const { average, limit, windowDays } = outcome.details;
-        return `✅ ${subject.sentLabel} por email${destination}: promedio ${formatKwh(average)} kWh/día en ${describeWindow(windowDays)}, límite ${formatKwh(limit)}.`;
+        return `✅ ${subject.sentLabel} por email${destination}: promedio ${formatKwh(average)} kWh/día en ${describeWindow(windowDays)}, límite ${formatKwh(limit)} kWh/día.`;
     }
     return `✅ ${subject.sentLabel} por email${destination} a las ${formatLocalTime(outcome.at)}.`;
 }
@@ -69,7 +69,7 @@ function buildAlreadySentText(subject, outcome) {
 function buildSkippedText(subject, outcome) {
     if (outcome.reason === 'below-threshold' && outcome.details) {
         const { average, limit } = outcome.details;
-        return `ℹ️ ${subject.title}: el promedio (${formatKwh(average)} kWh/día) está por debajo del límite (${formatKwh(limit)}). No se envió email.`;
+        return `ℹ️ ${subject.title}: el promedio (${formatKwh(average)} kWh/día) está por debajo del límite (${formatKwh(limit)} kWh/día). No se envió email.`;
     }
     if (outcome.reason === 'invalid-threshold') {
         return `ℹ️ ${subject.title}: configuración inválida, revisá los valores en Notificaciones.`;
