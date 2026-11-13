@@ -32,11 +32,14 @@ Plain JS ES modules bundled by Vite into `dist/`, which is what Chrome loads (se
 | `src/background.js` | Message router (`messageHandlers`), session login, data refresh, update badge, `onStartup` trigger. |
 | `src/services/epecAPIservice.js` | EPEC client (`epecFetch` helper, contracts, current period, daily consumption normalised and sorted newest first). |
 | `src/services/dailyReportService.js` | Decides whether today's report is due and asks the server to send it. |
+| `src/services/alertService.js` | Evaluates the rolling-average threshold and asks the server for an alert. |
+| `src/services/emailApi.js` | Shared email POST: 15 s timeout, classifies the answer into an outcome. |
+| `src/utils/maskEmail.js`, `src/utils/emailStatusText.js` | Masked recipient (`fa•••@domain`) and the popup's Spanish email-status lines. |
 | `src/storage/*` | Storage keys and getters (`getEpecUser`, `getBearerToken`, `getContractId`). |
 | `src/utils/consumptionMetrics.js` | `toKwh()` (numbers or `"12,4"` strings) and `summarizeConsumption()` (total, average, 28-day projection), shared by the popup and the email report. |
 | `src/popup.*` | Reports tab (total, daily average, 28-day projection, daily list) and Notifications tab (weekday picker; alert threshold UI is hidden). |
 
-Storage keys: `epecUser`, `consumptionData`, `lastUpdated`, `notificationPrefs`, `lastReportSentOn`.
+Storage keys: `epecUser`, `consumptionData`, `lastUpdated`, `notificationPrefs`, `lastReportSentOn`, `lastAlertSentOn`, `sessionExpired`, `selectedContractId`, `lastEmailStatus` (`{ report, alert }`, the latest outcome of each email, shown in the popup).
 
 ### Server (`epec-consumos-webhooks-server/`)
 
@@ -52,6 +55,8 @@ services/emailService.ts            nodemailer Gmail transport, sendEmail() thro
 services/epecAPIservice.ts          getContratos(), used as the token check
 services/dailyRateLimiter.ts        in-memory limiter
 config.ts                           getPort(): PORT from env, 3000 fallback
+listenResult.ts                     logs 'running', or logs the listen error (EACCES/EADDRINUSE) and exits 1
+maskEmail.ts                        fa•••@domain for the 'Email sent to …' log line
 ```
 
 ## API
@@ -93,7 +98,7 @@ All calls send `apikey` (`web-prod`, EPEC's public web key) and `Authorization: 
 
 **Login capture.** The user logs in on epec.com.ar → `content-main.js` sees the `/api/login` response → `content-isolated.js` forwards it → `background.js` fetches contracts, stores `epecUser`, refreshes data.
 
-**Data refresh** (`refreshData` from the popup, after login, on Chrome start). Current period → daily readings → set the `!` badge if the newest reading changed → store `consumptionData` → `sendDailyReportIfDue()`.
+**Data refresh** (`refreshData` from the popup, after login, on Chrome start). Current period → daily readings → set the `!` badge if the newest reading changed → store `consumptionData` → `sendDailyReportIfDue()` and `sendThresholdAlertIfDue()`. Both outcomes are stored as `lastEmailStatus` and returned as `emailStatus` in the `refreshData`, login and `selectContract` answers; one email failing never stops the other or the refresh.
 
 **Daily report (on demand).**
 
@@ -109,9 +114,22 @@ sequenceDiagram
   E-->>S: 200
   S->>S: limiter.tryReserve("report:<documento>")
   S->>G: sendMail(to = token email)
-  S-->>BG: 200 (or 429 if already sent)
+  S-->>BG: 200 {status:"sent"} (or 429 if already sent)
   BG->>BG: lastReportSentOn = today
 ```
+
+**Email outcomes.** Each sender returns `{ kind, result, reason, at, status?, server?, recipient?, details? }` instead of throwing, so the popup can say what happened:
+
+| result | reason | Day recorded? |
+|---|---|---|
+| `sent` | 200 with body `{ status: "sent" }` | yes |
+| `already-sent` | 429 from the server, or `already-sent-locally` (day key already today, no call) | yes / already |
+| `failed` | `server-unreachable` (fetch threw), `timeout` (15 s abort), `session-rejected` (401/403), `invalid-data` (400, server message in `details`), `server-error` (other status), `unexpected-response` (200 without `{status:"sent"}`), `unexpected-error` (bug or storage error) | no, retried on the next refresh |
+| `skipped` | `disabled`, `not-today`, `no-data`, `session-expired`; alerts also `invalid-threshold`, `below-threshold` (average/limit/window in `details`) | no |
+
+`recipient` is the EPEC user's email masked as `fa•••@domain` (the server sends to the same address, taken from the token). Logs carry only kind, result, reason and status.
+
+**Server start.** Express 5 reports listen failures to the `app.listen` callback; `handleListenResult` logs the port and code (EACCES: port reserved or not permitted, EADDRINUSE: port already in use) and exits 1, and only logs "running" on success.
 
 ## Security model
 
@@ -155,7 +173,7 @@ Both projects use Vitest: 53 server tests and 108 extension tests. `npm test` at
 
 ## Known limitations and follow-ups
 
-- **Expired EPEC token:** reports fail with 401 until the user visits epec.com.ar again. The extension logs it and retries on the next refresh.
+- **Expired EPEC token:** reports fail with 401 until the user visits epec.com.ar again. The popup shows it and the extension retries on the next refresh.
 - **Alerts:** `/sendEmailAlert` exists, but the extension does not compute threshold alerts yet (the alert UI is hidden in the popup).
 - **One contract per user:** only `contratos[0]` is used.
 - **Old database:** the Railway Postgres from the previous design may still hold encrypted tokens and emails of users who opted in. Purge it or drop the database. This is a manual step outside the code.

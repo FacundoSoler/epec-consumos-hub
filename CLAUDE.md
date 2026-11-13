@@ -38,6 +38,7 @@ Extension (`epec-consumption-reporting-extension/`):
 - Server imports use `.js` extensions even for `.ts` files (NodeNext).
 - No user data is stored server-side; the old Postgres layer was removed deliberately. Discuss before adding persistence.
 - Email recipients come from the verified EPEC token (`res.locals.epecUser.email`), never from the request body.
+- Email senders return an outcome (stored as `lastEmailStatus`, shown in the popup) instead of throwing; `lastReportSentOn`/`lastAlertSentOn` are written only on 200 `{status:'sent'}` or 429. Never log the full email; use `maskEmail`.
 - Every email route is `requireEpecToken` → `limitOneEmailPerDay` → controller. The limiter is in-memory and only correct on a single server instance.
 - EPEC returns `consumo` as `"12,4"`; `getEpecData` normalises to numbers and sorts newest first, so `[0]` is the latest day.
 - Dates use `America/Argentina/Cordoba`. Weekdays are `"0".."6"` strings with Sunday = `"0"`. EPEC's `hasta` is `DDMMYYYYHHmm`.
