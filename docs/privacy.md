@@ -49,7 +49,7 @@ El uso de la información obtenida cumple con la [Política de datos de usuario 
 
 ## Contacto
 
-Consultas sobre privacidad: [abrí un issue en GitHub](https://github.com/FacundoSoler/epec-consumos-hub/issues).
+Consultas sobre privacidad: [fa.soler86@gmail.com](mailto:fa.soler86@gmail.com).
 
 ---
 
@@ -100,4 +100,4 @@ The use of information received complies with the [Chrome Web Store User Data Po
 
 ## Contact
 
-Privacy questions: [open an issue on GitHub](https://github.com/FacundoSoler/epec-consumos-hub/issues).
+Privacy questions: [fa.soler86@gmail.com](mailto:fa.soler86@gmail.com).
