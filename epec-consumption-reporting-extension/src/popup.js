@@ -3,6 +3,7 @@ import { summarizeConsumption, toKwh } from './utils/consumptionMetrics.js';
 import { resolveSelectedContract, store } from './storage/store.js';
 import { showSessionExpiredBadge } from './services/sessionService.js';
 import { validateAlertThreshold } from './services/alertService.js';
+import { buildEmailStatusLine } from './utils/emailStatusText.js';
 
 const EPEC_LOGIN_URL = 'https://www.epec.com.ar/usuario/ingreso?returnTo=%2Foficina-virtual%2Fmis-datos';
 
@@ -192,6 +193,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (result.lastUpdated) status.innerText = `Ultima actualizacion: ${result.lastUpdated}`;
     });
 
+    chrome.storage.local.get([localStorageKeys.LAST_EMAIL_STATUS], (result) => {
+        renderEmailStatus(result[localStorageKeys.LAST_EMAIL_STATUS]);
+    });
+
     chrome.storage.local.get([localStorageKeys.NOTIFICATION_PREFERENCES], (data) => {
         if (data.notificationPrefs) {
             const prefs = data.notificationPrefs;
@@ -233,6 +238,18 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('totalConsumption').innerHTML = `<b>${Math.round(total)} </b> kWh`;
         document.getElementById('averageConsumption').innerHTML = `<b>${Math.round(average)} </b> kWh`;
         document.getElementById('projectedConsumption').innerHTML = `<b>${Math.round(projected)} </b> kWh`;
+    }
+
+    function renderEmailStatus(emailStatus) {
+        renderEmailStatusLine(document.getElementById('email-report-status'), emailStatus?.report);
+        renderEmailStatusLine(document.getElementById('email-alert-status'), emailStatus?.alert);
+    }
+
+    // textContent only: the line can include a server-provided validation message.
+    function renderEmailStatusLine(element, outcome) {
+        const line = buildEmailStatusLine(outcome);
+        element.textContent = line?.text ?? '';
+        element.className = line ? `email-status ${line.tone}` : 'email-status';
     }
 
     function renderContractPicker(contracts, selectedContract) {

@@ -192,6 +192,24 @@
             transform: translateX(16px);
         }
 
+        /* --- Email send status --- */
+        .email-status {
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        .email-status.success {
+            color: #00875a;
+        }
+
+        .email-status.error {
+            color: #d9534f;
+        }
+
+        .email-status.neutral {
+            color: #777;
+        }
+
         /* Panel transition */
         .settings-panel {
             transition: opacity 0.2s ease;
@@ -234,6 +252,8 @@
             <p style="color: #00875a; font-size: 12px; margin-top: 0;">✔ Sincronización activa para reportes.</p>
             <button id="refreshBtn">Refrescar Data</button>
             <div id="status" style="font-size: 14px; color: gray; margin-top:5px"></div>
+            <div id="email-report-status" class="email-status"></div>
+            <div id="email-alert-status" class="email-status"></div>
 
             <table style="width: 100%; font-size: 13px; margin-top: 10px;">
                 <tbody>
