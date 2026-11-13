@@ -93,7 +93,7 @@ describe('send failure logging', () => {
         });
     }
 
-    it('logs a structured error with the masked recipient and the SMTP code and reply, keeping the 502', async () => {
+    it('logs only the masked recipient and the codes, never the address or Gmail text, keeping the 502', async () => {
         const errorSpy = vi.mocked(console.error);
         errorSpy.mockClear();
         sendEmail.mockRejectedValue(smtpError());
@@ -104,26 +104,25 @@ describe('send failure logging', () => {
         expect(res.body).toEqual({ error: 'The email provider rejected the message. Try again later.' });
         expect(errorSpy).toHaveBeenCalledOnce();
         const line = String(errorSpy.mock.calls[0][0]);
-        expect(JSON.parse(line)).toMatchObject({
+        const { timestamp: _timestamp, message: _message, ...fields } = JSON.parse(line);
+        expect(fields).toEqual({
             level: 'error',
             area: 'email',
             recipient: 'an*@example.com',
             code: 'EENVELOPE',
-            responseCode: 550,
-            response: '550 5.1.1 <an*@example.com> does not exist'
+            responseCode: 550
         });
         expect(line).not.toContain('ana@example.com');
+        expect(line).not.toContain('does not exist');
     });
 
-    it('describes a network failure that has only a code and message', () => {
+    it('describes a network failure that has only a code', () => {
         const error = Object.assign(new Error('connect ETIMEDOUT 142.250.0.1:465'), { code: 'ETIMEDOUT' });
 
         expect(describeSendFailure(error, 'ana@example.com')).toEqual({
             recipient: 'an*@example.com',
             code: 'ETIMEDOUT',
-            responseCode: undefined,
-            response: undefined,
-            error: 'connect ETIMEDOUT 142.250.0.1:465'
+            responseCode: undefined
         });
     });
 

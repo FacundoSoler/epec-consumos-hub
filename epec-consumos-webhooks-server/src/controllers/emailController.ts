@@ -34,26 +34,15 @@ function getEmailRequestValidationError(subject: unknown, htmlContent: unknown) 
 }
 
 /**
- * nodemailer puts the SMTP reply in `response` and a code like EAUTH or ECONNECTION in `code`.
- * SMTP replies and messages can echo the recipient, so the address is replaced by its masked form.
- * Credentials never appear in these fields; the transport config is not logged.
+ * Only nodemailer's code (EAUTH, ETIMEDOUT…) and the SMTP response code: Gmail's reply text and
+ * error messages can echo the recipient's address, so they are never logged.
  */
 export function describeSendFailure(error: unknown, recipient: string): LogFields {
-    const failure = (error ?? {}) as { code?: unknown; responseCode?: unknown; response?: unknown; message?: unknown };
-    const masked = maskEmail(recipient) ?? 'unknown recipient';
-    const redact = (value: unknown) => typeof value === 'string'
-        ? firstLine(value).split(recipient).join(masked)
-        : undefined;
+    const failure = (error ?? {}) as { code?: unknown; responseCode?: unknown };
 
     return {
-        recipient: masked,
+        recipient: maskEmail(recipient) ?? 'unknown recipient',
         code: typeof failure.code === 'string' ? failure.code : undefined,
-        responseCode: typeof failure.responseCode === 'number' ? failure.responseCode : undefined,
-        response: redact(failure.response),
-        error: redact(failure.message)
+        responseCode: typeof failure.responseCode === 'number' ? failure.responseCode : undefined
     };
-}
-
-function firstLine(text: string): string {
-    return text.split(/\r?\n/)[0];
 }
