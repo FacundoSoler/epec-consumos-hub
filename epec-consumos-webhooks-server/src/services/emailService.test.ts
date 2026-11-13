@@ -43,6 +43,19 @@ describe('sendEmail', () => {
         await expect(sendEmail('s', 'h', 'a@b.c')).resolves.toBe('id-42');
     });
 
+    it('logs the masked recipient and the Gmail message id, never the full address', async () => {
+        sendMail.mockResolvedValue({ messageId: '<id-42@gmail.com>' });
+
+        await sendEmail('s', 'h', 'facundo@hotmail.com');
+
+        const lines = vi.mocked(console.log).mock.calls.map(([line]) => String(line));
+        const output = lines.at(-1) ?? '';
+        const entry = JSON.parse(output);
+        expect(entry).toMatchObject({ level: 'info', area: 'email' });
+        expect(entry.message).toBe('Email sent to fa•••@hotmail.com (Gmail message id <id-42@gmail.com>)');
+        expect(lines.join(' ')).not.toContain('facundo@');
+    });
+
     it('rejects when the provider fails instead of swallowing the error', async () => {
         sendMail.mockRejectedValue(new Error('Invalid login'));
 

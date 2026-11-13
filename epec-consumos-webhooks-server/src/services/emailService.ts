@@ -1,4 +1,8 @@
 import nodemailer from 'nodemailer';
+import { createLogger } from '../logger.js';
+import { maskEmail } from '../maskEmail.js';
+
+const log = createLogger('email');
 
 const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -16,6 +20,6 @@ export async function sendEmail(subject: string, htmlContent: string, sendToEmai
         html: htmlContent
     });
 
-    console.log('Email sent %s', info.messageId);
+    log.info(`Email sent to ${maskEmail(sendToEmailAddress) ?? 'unknown recipient'} (Gmail message id ${info.messageId})`);
     return info.messageId;
 }
