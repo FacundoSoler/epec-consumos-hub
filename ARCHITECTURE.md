@@ -2,7 +2,7 @@
 
 ## Overview
 
-EPEC Consumos Hub lets an EPEC customer see daily smart-meter consumption (kWh) in a Chrome popup and receive a daily email report. It is built so that **the server stores no customer data**: the extension holds the session and decides when a report is due; the server only verifies the caller with EPEC and sends the email.
+EPEC Consumos Hub lets an EPEC customer see daily smart-meter consumption (kWh) in a Chrome popup and receive a daily email report plus an alert when the rolling average passes a limit. It is built so that **the server stores no customer data**: the extension holds the session and decides when a report is due; the server only verifies the caller with EPEC and sends the email.
 
 ```mermaid
 flowchart LR
@@ -29,15 +29,17 @@ Plain JS ES modules bundled by Vite into `dist/`, which is what Chrome loads (se
 |---|---|
 | `src/content-main.js` | Runs in the page's JS world. Patches `fetch` and `XMLHttpRequest.prototype` to read the site's own `/api/login` response and posts it to the page origin. |
 | `src/content-isolated.js` | Accepts that message only from the same window/origin and forwards it to the background. Also replays a session persisted in the site's `localStorage.epecUserData`. |
-| `src/background.js` | Message router (`messageHandlers`), session login, data refresh, update badge, `onStartup` trigger. |
+| `src/background.js` | Message router (`messageHandlers`), session login, contract selection, data refresh, update badge, `onStartup` trigger, email outcomes (`lastEmailStatus`). |
 | `src/services/epecAPIservice.js` | EPEC client (`epecFetch` helper, contracts, current period, daily consumption normalised and sorted newest first). |
 | `src/services/dailyReportService.js` | Decides whether today's report is due and asks the server to send it. |
 | `src/services/alertService.js` | Evaluates the rolling-average threshold and asks the server for an alert. |
+| `src/services/sessionService.js` | Marks the session expired when EPEC rejects the stored token (badge + popup banner, emails paused) and clears it after a successful refresh or login. |
 | `src/services/emailApi.js` | Shared email POST: 15 s timeout, classifies the answer into an outcome. |
 | `src/utils/maskEmail.js`, `src/utils/emailStatusText.js` | Masked recipient (`fa•••@domain`) and the popup's Spanish email-status lines. |
-| `src/storage/*` | Storage keys and getters (`getEpecUser`, `getBearerToken`, `getContractId`). |
+| `src/storage/*` | Storage keys and getters (`getEpecUser`, `getBearerToken`, `getContractId` for the selected contract, `isSessionExpired`) and `resolveSelectedContract`. |
 | `src/utils/consumptionMetrics.js` | `toKwh()` (numbers or `"12,4"` strings) and `summarizeConsumption()` (total, average, 28-day projection), shared by the popup and the email report. |
-| `src/popup.*` | Reports tab (total, daily average, 28-day projection, daily list) and Notifications tab (weekday picker; alert threshold UI is hidden). |
+| `src/utils/logger.js`, `src/utils/html.js`, `src/utils/utils.js` | Structured JSON logger, HTML escaping for email bodies, Córdoba date helpers. |
+| `src/popup.*` | Reports tab (total, daily average, 28-day projection, daily list, last report/alert email status), contract picker when the user has several contracts, session-expired banner, and Notifications tab (report weekdays, alert limit and window). |
 
 Storage keys: `epecUser`, `consumptionData`, `lastUpdated`, `notificationPrefs`, `lastReportSentOn`, `lastAlertSentOn`, `sessionExpired`, `selectedContractId`, `lastEmailStatus` (`{ report, alert }`, the latest outcome of each email, shown in the popup).
 
@@ -50,13 +52,14 @@ routes/emailRoutes.ts               POST /api/email/sendEmailNotification | /sen
 routes/healthRoutes.ts              GET /api/health (no auth, no limit)
 middleware/requireEpecToken.ts      Bearer token → EPEC must accept it → res.locals.epecUser {email, documento}
 middleware/limitOneEmailPerDay.ts   one email per kind per user per Córdoba day (429 otherwise)
-controllers/emailController.ts      validates {subject, htmlContent}, sends to the token's email
+controllers/emailController.ts      validates {subject, htmlContent}, sends to the token's email, logs failures (masked)
 services/emailService.ts            nodemailer Gmail transport, sendEmail() throws on failure
 services/epecAPIservice.ts          getContratos(), used as the token check
 services/dailyRateLimiter.ts        in-memory limiter
 config.ts                           getPort(): PORT from env, 3000 fallback
 listenResult.ts                     logs 'running', or logs the listen error (EACCES/EADDRINUSE) and exits 1
-maskEmail.ts                        fa•••@domain for the 'Email sent to …' log line
+maskEmail.ts                        fa•••@domain for the email success and failure log lines
+logger.ts                           structured JSON logger, hashUser() for DNIs, LOG_HASH_SECRET check
 ```
 
 ## API
@@ -90,7 +93,7 @@ All calls send `apikey` (`web-prod`, EPEC's public web key) and `Authorization: 
 | Endpoint | Use |
 |---|---|
 | `POST /api/login` | Not called by us; intercepted from the site |
-| `GET /usuarios/contratos` | Contracts (`id`, `nroCliente`, `razonSocial`, `direccion`); only `[0]` is used. Server uses it as the token check. |
+| `GET /usuarios/contratos` | Contracts (`id`, `nroCliente`, `razonSocial`, `direccion`); the extension uses the selected one (first by default). Server uses it as the token check. |
 | `GET /usuarios/contratos/{id}/consumos/tipo-medicion` | Current billing period (`desde`, `hasta`, meter info) |
 | `GET /usuarios/contratos/{id}/consumos/con-telemedicion/MED_INTELIGENTE/CONSUMO_DIARIO?desde&hasta` | Daily readings `{fechaHora: "dd/mm/yyyy", consumo: "12,4"}`; `hasta` is `DDMMYYYYHHmm`, Córdoba time |
 
@@ -164,7 +167,7 @@ sequenceDiagram
 
 ## Testing
 
-Both projects use Vitest: 53 server tests and 108 extension tests. `npm test` at the repo root runs both suites in sequence (always both, exit code 1 if either fails), or run `npm run test:run` inside one folder.
+Both projects use Vitest: 94 server tests and 279 extension tests. `npm test` at the repo root runs both suites in sequence (always both, exit code 1 if either fails), or run `npm run test:run` inside one folder.
 
 - **Server** tests sit next to the code (`src/**/*.test.ts`). `src/testing/fakeExpress.ts` provides request/response fakes, and nodemailer and the EPEC client are replaced with `vi.mock`, so no network or SMTP is needed.
 - **Extension** tests live in `tests/` and run in Node rather than a browser. Small fakes stand in for what Chrome and the page provide: `chromeMock.js` (storage with both promise and callback styles, `onMessage`, `onStartup`, badge), `epecApiMock.js` (`fetch` routed to canned EPEC responses) and `pageMock.js` (the page `window` and a fake `XMLHttpRequest` whose events tests fire by hand). Content scripts and `background.js` are imported fresh per test with `vi.resetModules()`, because they register listeners at load time.
@@ -173,9 +176,9 @@ Both projects use Vitest: 53 server tests and 108 extension tests. `npm test` at
 
 ## Known limitations and follow-ups
 
-- **Expired EPEC token:** reports fail with 401 until the user visits epec.com.ar again. The popup shows it and the extension retries on the next refresh.
-- **Alerts:** `/sendEmailAlert` exists, but the extension does not compute threshold alerts yet (the alert UI is hidden in the popup).
-- **One contract per user:** only `contratos[0]` is used.
+- **Expired EPEC token:** EPEC issues no refresh token, so after a 401/403 the session is marked expired, emails pause and the popup asks the user to log in on epec.com.ar again.
+- **One contract at a time:** data, the badge, reports and alerts follow the selected contract only, because the server allows one report and one alert per user per day.
+- **On-demand emails:** a report or alert only goes out when Chrome is open and data refreshes that day.
 - **Old database:** the Railway Postgres from the previous design may still hold encrypted tokens and emails of users who opted in. Purge it or drop the database. This is a manual step outside the code.
 - **Rate limiter:** single instance only (see above).
 
