@@ -39,7 +39,7 @@ describe('EPEC session expired state', () => {
 
         const response = await mock.dispatch({ action: 'refreshData' });
 
-        expect(response).toEqual({ success: false });
+        expect(response).toEqual({ success: false, emailStatus: null });
         expect(mock.storage.sessionExpired).toBe(true);
         expect(mock.chrome.action.setBadgeText).toHaveBeenCalledWith({ text: '!' });
     });
@@ -69,7 +69,7 @@ describe('EPEC session expired state', () => {
 
         const response = await mock.dispatch({ action: 'refreshData' });
 
-        expect(response).toEqual({ success: true });
+        expect(response).toMatchObject({ success: true });
         expect(mock.storage.sessionExpired).toBe(false);
         expect(mock.chrome.action.setBadgeText).toHaveBeenCalledWith({ text: '' });
         expect(fetchMock.mock.calls.some(isServerCall)).toBe(true);
@@ -81,7 +81,7 @@ describe('EPEC session expired state', () => {
 
         const response = await mock.dispatch({ type: 'LOGIN_EPEC_SESSION', payload: loginPayload });
 
-        expect(response).toEqual({ success: true });
+        expect(response).toMatchObject({ success: true });
         expect(mock.storage.sessionExpired).toBe(false);
         expect(mock.storage.consumptionData).toHaveLength(2);
         expect(fetchMock.mock.calls.some(isServerCall)).toBe(true);

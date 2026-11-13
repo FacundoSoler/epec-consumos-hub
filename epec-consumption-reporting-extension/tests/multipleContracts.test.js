@@ -51,7 +51,7 @@ describe('contract selection', () => {
 
         const response = await mock.dispatch({ action: 'selectContract', payload: 'C2' });
 
-        expect(response).toEqual({ success: true });
+        expect(response).toMatchObject({ success: true });
         expect(mock.storage.selectedContractId).toBe('C2');
         expect(mock.storage.consumptionData.map((r) => r.consumo)).toEqual([40]);
         const reportCall = fetchMock.mock.calls.find(([url]) => url.endsWith('/email/sendEmailNotification'));
@@ -96,7 +96,7 @@ describe('contract selection', () => {
 
         const response = await mock.dispatch({ action: 'selectContract', payload: '1002' });
 
-        expect(response).toEqual({ success: true });
+        expect(response).toMatchObject({ success: true });
         expect(consumptionUrls(fetchMock).every((url) => url.includes('/contratos/1002/'))).toBe(true);
         expect(String(mock.storage.selectedContractId)).toBe('1002');
     });

@@ -6,5 +6,6 @@ export const localStorageKeys = Object.freeze({
     "LAST_REPORT_SENT_ON": 'lastReportSentOn',
     "SESSION_EXPIRED": 'sessionExpired',
     "LAST_ALERT_SENT_ON": 'lastAlertSentOn',
-    "SELECTED_CONTRACT_ID": 'selectedContractId'
+    "SELECTED_CONTRACT_ID": 'selectedContractId',
+    "LAST_EMAIL_STATUS": 'lastEmailStatus'
 });

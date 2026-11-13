@@ -6,6 +6,7 @@ import { getToDate } from './utils/utils.js';
 import { sendDailyReportIfDue } from './services/dailyReportService.js';
 import { sendThresholdAlertIfDue } from './services/alertService.js';
 import { createLogger } from './utils/logger.js';
+import { createEmailOutcome } from './services/emailApi.js';
 import { clearSessionExpired, markSessionExpiredIfRejected } from './services/sessionService.js';
 
 const log = createLogger('background');
@@ -15,7 +16,7 @@ const emailLog = createLogger('email');
 const API_BASE_URL = __API_BASE_URL__;
 
 const messageHandlers = {
-    refreshData: async () => ({ success: await fetchData() }),
+    refreshData: fetchData,
     logOff: logOff,
     save_notifications: (request) => saveNotificationPreferences(request.payload),
     selectContract: (request) => selectContract(request.payload),
@@ -63,7 +64,7 @@ async function loginEpecSession(rawSession) {
     await clearSessionExpired();
     console.log('EPEC identity profile successfully synchronized.');
 
-    return { success: await fetchData() };
+    return fetchData();
 }
 
 async function logOff() {
@@ -102,11 +103,12 @@ async function selectContract(requestedContractId) {
     });
     // A "new readings" badge described the previous contract.
     chrome.action.setBadgeText({ text: '' });
-    await sendEmailsIfDue();
+    const emailStatus = await sendEmailsIfDue();
 
-    return { success: true };
+    return { success: true, emailStatus };
 }
 
+/** @returns {Promise<{ success: boolean, emailStatus: EmailStatus | null }>} emailStatus is null when no email was attempted */
 async function fetchData() {
     let bearerToken;
     try {
@@ -116,7 +118,7 @@ async function fetchData() {
 
         if (data.length === 0) {
             log.warn('No consumption data found to calculate.');
-            return false;
+            return { success: false, emailStatus: null };
         }
 
         await clearSessionExpired();
@@ -125,13 +127,13 @@ async function fetchData() {
             [localStorageKeys.CONSUMPTION_DATA]: data,
             [localStorageKeys.LAST_UPDATED]: new Date().toLocaleString()
         });
-        await sendEmailsIfDue();
+        const emailStatus = await sendEmailsIfDue();
 
-        return true;
+        return { success: true, emailStatus };
     } catch (err) {
         log.error('Fetch failed', describeError(err));
         await markSessionExpiredIfRejected(err, bearerToken);
-        return false;
+        return { success: false, emailStatus: null };
     }
 }
 
@@ -140,11 +142,39 @@ async function loadContractReadings(contractId, bearerToken) {
     return getEpecData(contractId, bearerToken, currentContractPeriod.desde, getToDate());
 }
 
+/**
+ * @typedef {import('./services/emailApi.js').EmailOutcome} EmailOutcome
+ * @typedef {{ report: EmailOutcome, alert: EmailOutcome }} EmailStatus
+ */
+
+/**
+ * Stored so the popup can tell the user what happened to the emails, which otherwise
+ * only the service-worker console would show.
+ * @returns {Promise<EmailStatus>}
+ */
 async function sendEmailsIfDue() {
-    await sendDailyReportIfDue(API_BASE_URL)
-        .catch((error) => emailLog.error('Daily report not sent', describeError(error)));
-    await sendThresholdAlertIfDue(API_BASE_URL)
-        .catch((error) => emailLog.error('Threshold alert not sent', describeError(error)));
+    const report = await runEmailSender('report', sendDailyReportIfDue);
+    const alert = await runEmailSender('alert', sendThresholdAlertIfDue);
+    const emailStatus = { report, alert };
+
+    await chrome.storage.local.set({ [localStorageKeys.LAST_EMAIL_STATUS]: emailStatus });
+    return emailStatus;
+}
+
+// Expected failures already come back as outcomes; this turns anything else (e.g. storage errors)
+// into one too, so one sender failing never stops the other or the data refresh.
+async function runEmailSender(kind, sender) {
+    const outcome = await sender(API_BASE_URL)
+        .catch((error) => createEmailOutcome(kind, 'failed', 'unexpected-error', { details: { error: error?.message } }));
+    logEmailOutcome(outcome);
+    return outcome;
+}
+
+// Only kind, result, reason and status: the outcome's masked recipient stays out of logs too.
+function logEmailOutcome({ kind, result, reason, status }) {
+    const fields = { kind, result, reason, status };
+    if (result === 'failed') emailLog.error('Email not sent', fields);
+    else emailLog.info('Email outcome', fields);
 }
 
 // Readings are sorted newest first (see getEpecData), so index 0 is the latest day.
