@@ -3,12 +3,14 @@ import {
     KWH_LIMIT_OPTIONS,
     QUICK_DAY_SELECTIONS,
     WEEKDAY_OPTIONS,
+    buildNotificationPreferences,
     orderDaysMondayFirst,
     toggleDay,
     ROLLING_DAYS_OPTIONS,
     resolveAlertSelection,
     snapToNearestOption
 } from '../src/utils/notificationOptions.js';
+import { validateAlertThreshold } from '../src/services/alertService.js';
 
 describe('alert threshold options', () => {
     it('offers 5 to 50 kWh in steps of 5', () => {
@@ -106,5 +108,38 @@ describe('toggleDay', () => {
 
     it('removes a selected day', () => {
         expect(toggleDay(['1', '5', '0'], '0')).toEqual(['1', '5']);
+    });
+});
+
+describe('buildNotificationPreferences', () => {
+    it('builds the stored preferences shape with string days and numeric threshold', () => {
+        const preferences = buildNotificationPreferences({
+            reportsEnabled: true,
+            reportDays: ['0', '1', '5'],
+            alertsEnabled: false,
+            kwhLimit: '25',
+            rollingDays: '7'
+        });
+
+        expect(preferences).toStrictEqual({
+            email_reports: { enabled: true, days: ['1', '5', '0'] },
+            email_alerts: { enabled: false, threshold: { kwh_limit_per_day: 25, rolling_days_window: 7 } }
+        });
+    });
+
+    it('stores booleans and an empty day list for an untouched form', () => {
+        const preferences = buildNotificationPreferences({ reportDays: [], kwhLimit: 15, rollingDays: 3 });
+
+        expect(preferences.email_reports).toStrictEqual({ enabled: false, days: [] });
+        expect(preferences.email_alerts.enabled).toBe(false);
+    });
+
+    it('produces a threshold the alert validation accepts for every dropdown choice', () => {
+        for (const kwhLimit of KWH_LIMIT_OPTIONS) {
+            for (const rollingDays of ROLLING_DAYS_OPTIONS) {
+                const { email_alerts } = buildNotificationPreferences({ reportDays: [], kwhLimit, rollingDays });
+                expect(validateAlertThreshold(email_alerts.threshold)).toBeNull();
+            }
+        }
     });
 });

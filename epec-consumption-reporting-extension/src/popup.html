@@ -249,6 +249,22 @@
             color: #777;
         }
 
+        .save-status {
+            font-size: 11px;
+            min-height: 14px;
+            margin-bottom: 4px;
+            color: #00875a;
+            transition: opacity 0.4s ease;
+        }
+
+        .save-status.error {
+            color: #d9534f;
+        }
+
+        .save-status.faded {
+            opacity: 0;
+        }
+
         /* Panel transition */
         .settings-panel {
             transition: opacity 0.2s ease;
@@ -318,10 +334,11 @@
             <div class="toggle-header">
                 <div class="section-title">Reportes Diarios (Email)</div>
                 <label class="switch">
-                    <input type="checkbox" id="toggle-email">
+                    <input type="checkbox" id="toggle-email" aria-label="Reportes diarios por email">
                     <span class="slider"></span>
                 </label>
             </div>
+            <div id="save-status-reports" class="save-status" role="status" aria-live="polite"></div>
 
             <div id="panel-email" class="settings-panel hidden">
                 <div class="day-pills" id="day-pills" role="group" aria-label="Días de envío"></div>
@@ -331,10 +348,11 @@
             <div class="toggle-header" style="margin-top: 15px;">
                 <div class="section-title">Alertas de Exceso (Email)</div>
                 <label class="switch">
-                    <input type="checkbox" id="toggle-emailAlerts">
+                    <input type="checkbox" id="toggle-emailAlerts" aria-label="Alertas de exceso por email">
                     <span class="slider"></span>
                 </label>
             </div>
+            <div id="save-status-alerts" class="save-status" role="status" aria-live="polite"></div>
 
             <div id="panel-alerts" class="settings-panel hidden">
                 <div class="input-group">
@@ -352,9 +370,6 @@
                 </p>
             </div>
 
-            <button id="save-notifications" style="margin-top: 15px;">Guardar Cambios</button>
-            <div id="save-status"
-                style="font-size: 12px; color: #00875a; margin-top: 5px; text-align: center; min-height: 14px;"></div>
         </div>
 
     </div>

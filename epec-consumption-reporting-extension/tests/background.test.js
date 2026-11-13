@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createChromeMock } from './helpers/chromeMock.js';
 import { mockEpecApi } from './helpers/epecApiMock.js';
+import { buildNotificationPreferences } from '../src/utils/notificationOptions.js';
 
 const loginPayload = { documento: 30111222, nombre: 'Ana', apellido: 'Paz', email: 'ana@example.com', token: 'tok' };
 const storedUser = { ...loginPayload, contratos: [{ id: 'C1' }] };
@@ -113,6 +114,22 @@ describe('background message router', () => {
         expect(sendResponse).toHaveBeenCalledTimes(1);
         expect(sendResponse).toHaveBeenCalledWith({ success: true });
         expect(mock.storage.notificationPrefs).toEqual(preferences);
+    });
+
+    it('save_notifications stores the popup-built preferences unchanged', async () => {
+        mockEpecApi();
+        const mock = await loadBackground({ epecUser: storedUser });
+        const preferences = buildNotificationPreferences({
+            reportsEnabled: true, reportDays: ['1', '2', '3', '4', '5'], alertsEnabled: true, kwhLimit: '20', rollingDays: '3'
+        });
+
+        const response = await mock.dispatch({ action: 'save_notifications', payload: preferences });
+
+        expect(response).toEqual({ success: true });
+        expect(mock.storage.notificationPrefs).toStrictEqual({
+            email_reports: { enabled: true, days: ['1', '2', '3', '4', '5'] },
+            email_alerts: { enabled: true, threshold: { kwh_limit_per_day: 20, rolling_days_window: 3 } }
+        });
     });
 
     it('save_notifications without a stored user answers with an error', async () => {

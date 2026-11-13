@@ -53,3 +53,19 @@ export function toggleDay(days, value) {
     else selected.add(value);
     return orderDaysMondayFirst([...selected]);
 }
+
+export function buildNotificationPreferences({ reportsEnabled, reportDays, alertsEnabled, kwhLimit, rollingDays }) {
+    return {
+        email_reports: {
+            enabled: reportsEnabled === true,
+            days: orderDaysMondayFirst(reportDays)
+        },
+        email_alerts: {
+            enabled: alertsEnabled === true,
+            threshold: {
+                kwh_limit_per_day: Number(kwhLimit),
+                rolling_days_window: Number(rollingDays)
+            }
+        }
+    };
+}
