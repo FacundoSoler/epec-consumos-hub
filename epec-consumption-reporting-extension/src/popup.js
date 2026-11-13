@@ -1,0 +1,290 @@
+import { localStorageKeys } from './storage/localStorageKeys.js';
+import { summarizeConsumption, toKwh } from './utils/consumptionMetrics.js';
+import { resolveSelectedContract, store } from './storage/store.js';
+import { showSessionExpiredBadge } from './services/sessionService.js';
+import { validateAlertThreshold } from './services/alertService.js';
+import { buildPopupStatusLines } from './utils/emailStatusText.js';
+
+const EPEC_LOGIN_URL = 'https://www.epec.com.ar/usuario/ingreso?returnTo=%2Foficina-virtual%2Fmis-datos';
+
+document.addEventListener('DOMContentLoaded', () => {
+    const unauthView = document.getElementById('unauth-view');
+    const authView = document.getElementById('auth-view');
+    const userdisplay = document.getElementById('user-display');
+    const routeBtn = document.getElementById('route-login');
+    const routeLogOff = document.getElementById('route-logoff');
+    const contractSelect = document.getElementById('contract-select');
+
+    const toggleEmail = document.getElementById('toggle-email');
+    const panelEmail = document.getElementById('panel-email');
+    const toggleEmailAlerts = document.getElementById('toggle-emailAlerts');
+    const panelAlerts = document.getElementById('panel-alerts');
+
+    const blockInvalidChars = (e) => {
+        if (['-', '+', 'e', 'E'].includes(e.key)) {
+            e.preventDefault();
+        }
+    };
+
+    const avgInput = document.getElementById('alert-avg');
+    if (avgInput) avgInput.addEventListener('keydown', blockInvalidChars);
+
+    const daysInput = document.getElementById('alert-days');
+    if (daysInput) {
+        daysInput.addEventListener('keydown', blockInvalidChars);
+        daysInput.addEventListener('keydown', (e) => {
+            if (e.key === '.' || e.key === ',') {
+                e.preventDefault();
+            }
+        });
+    }
+
+    const handleToggleChange = (toggleEl, panelEl) => {
+        if (toggleEl.checked) {
+            panelEl.classList.remove('hidden');
+        } else {
+            panelEl.classList.add('hidden');
+        }
+    };
+
+    toggleEmail.addEventListener('change', () => handleToggleChange(toggleEmail, panelEmail));
+    toggleEmailAlerts.addEventListener('change', () => handleToggleChange(toggleEmailAlerts, panelAlerts));
+
+    setEmailReportsDaysOfTheWeek();
+
+    const openEpecLogin = () => chrome.tabs.create({ url: EPEC_LOGIN_URL });
+    routeBtn.addEventListener('click', openEpecLogin);
+    document.getElementById('route-relogin').addEventListener('click', openEpecLogin);
+
+    routeLogOff.addEventListener('click', () => {
+        chrome.runtime.sendMessage({ action: "logOff" }, (response) => {
+            if (chrome.runtime.lastError) {
+                console.error('Log Off error:', chrome.runtime.lastError.message);
+                status.innerHTML = "Error logging off.";
+                return;
+            }
+
+            if (!response || !response.success) {
+                console.error('Log off errored out.');
+                status.innerText = "El deslogueo ha fallado. Intente nuevamente en instantes."
+                return;
+            }
+
+            enableLoggedInPanel(false);
+
+            location.reload();
+        })
+    });
+
+    document.getElementById('refreshBtn').addEventListener('click', () => {
+        status.innerText = "Fetching...";
+
+        chrome.runtime.sendMessage({ action: "refreshData" }, (response) => {
+            if (chrome.runtime.lastError) {
+                console.error('Connection error:', chrome.runtime.lastError.message);
+                status.innerText = "Error connecting to background worker";
+                return;
+            }
+
+            if (!response || !response.success) console.error('The manual refresh errored out');
+
+            // Success or failure, the worker stored the outcome; the reload renders it.
+            location.reload();
+        });
+    });
+
+    // 1. Tab Switching Logic
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    const tabPanes = document.querySelectorAll('.tab-pane');
+
+    tabButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            tabButtons.forEach(b => b.classList.remove('active')); // unselect all Tabs
+            tabPanes.forEach(p => p.classList.remove('active')); // unselect all tab Panels
+
+            btn.classList.add('active'); // Make the selected tab Active
+            const targetId = btn.getAttribute('data-target');
+            document.getElementById(targetId).classList.add('active');
+        });
+    });
+
+    const saveNotificationsBtn = document.getElementById('save-notifications');
+    saveNotificationsBtn.addEventListener('click', () => {
+        const selectedDays = Array.from(document.querySelectorAll('.day-cb:checked')).map(cb => cb.value);
+        const threshold = {
+            kwh_limit_per_day: Number(document.getElementById('alert-avg').value),
+            rolling_days_window: Number(document.getElementById('alert-days').value)
+        };
+        const saveStatus = document.getElementById('save-status');
+
+        const thresholdError = toggleEmailAlerts.checked ? validateAlertThreshold(threshold) : null;
+        if (thresholdError) {
+            saveStatus.textContent = thresholdError;
+            saveStatus.style.color = 'red';
+            setTimeout(() => { saveStatus.textContent = ''; }, 5000);
+            return;
+        }
+
+        const preferences = {
+            email_reports: {
+                enabled: toggleEmail.checked,
+                days: selectedDays
+            },
+            email_alerts: {
+                enabled: toggleEmailAlerts.checked,
+                threshold
+            }
+        };
+
+        chrome.runtime.sendMessage({ action: 'save_notifications', payload: preferences }, (response) => {
+            if (response && response.success) {
+                saveStatus.textContent = '¡Preferencias guardadas exitosamente!';
+                saveStatus.style.color = '#00875a';
+            } else {
+                saveStatus.textContent = `${response?.error}. Error al guardar. Intente nuevamente.`;
+                saveStatus.style.color = 'red';
+                console.error('Save failed:', response?.error);
+            }
+            setTimeout(() => { saveStatus.textContent = ''; }, 5000);
+        });
+    });
+
+    chrome.action.setBadgeText({ text: '' });
+    const resultsList = document.getElementById('results');
+    const status = document.getElementById('status'); // clear the current badge icon if any was set.
+
+    chrome.storage.local.get([localStorageKeys.EPEC_USER, localStorageKeys.SELECTED_CONTRACT_ID], (result) => {
+        const epecUser = result[localStorageKeys.EPEC_USER];
+        if (epecUser && epecUser.nombre) {
+            enableLoggedInPanel(true);
+
+            const contract = resolveSelectedContract(epecUser.contratos, result[localStorageKeys.SELECTED_CONTRACT_ID]);
+            userdisplay.textContent = `${epecUser.nombre} ${epecUser.apellido} - Contrato: ${contract?.id ?? ''}`;
+            renderContractPicker(epecUser.contratos ?? [], contract);
+        }
+    });
+
+    contractSelect.addEventListener('change', () => {
+        status.innerText = "Actualizando contrato...";
+
+        chrome.runtime.sendMessage({ action: 'selectContract', payload: contractSelect.value }, (response) => {
+            if (chrome.runtime.lastError || !response || !response.success) {
+                console.error('Contract change failed:', chrome.runtime.lastError?.message ?? response?.error);
+                status.innerText = "No se pudo cambiar de contrato. Intente nuevamente en unos instantes.";
+                contractSelect.value = contractSelect.dataset.savedValue;
+                return;
+            }
+
+            location.reload();
+        });
+    });
+
+    store.isSessionExpired().then((expired) => {
+        document.getElementById('session-expired').classList.toggle('hidden', !expired);
+        // Opening the popup clears the badge above, but an expired session still needs the user.
+        if (expired) showSessionExpiredBadge();
+    });
+
+    chrome.storage.local.get([localStorageKeys.CONSUMPTION_DATA, localStorageKeys.LAST_UPDATED], (result) => {
+        if (result.consumptionData) renderLocalData(result.consumptionData);
+        if (result.lastUpdated) status.innerText = `Ultima actualizacion: ${result.lastUpdated}`;
+    });
+
+    chrome.storage.local.get([localStorageKeys.LAST_EMAIL_STATUS, localStorageKeys.LAST_REFRESH_ERROR], (result) => {
+        renderStatusLines(buildPopupStatusLines({
+            refreshError: result[localStorageKeys.LAST_REFRESH_ERROR],
+            emailStatus: result[localStorageKeys.LAST_EMAIL_STATUS]
+        }));
+    });
+
+    chrome.storage.local.get([localStorageKeys.NOTIFICATION_PREFERENCES], (data) => {
+        if (data.notificationPrefs) {
+            const prefs = data.notificationPrefs;
+
+            if (prefs.email_reports) {
+                toggleEmail.checked = prefs.email_reports.enabled === true;
+                handleToggleChange(toggleEmail, panelEmail); // Trigger UI update
+
+                if (prefs.email_reports.days) {
+                    document.querySelectorAll('.day-cb').forEach(cb => {
+                        cb.checked = prefs.email_reports.days.includes(cb.value);
+                    });
+                }
+            }
+
+            if (prefs.email_alerts) {
+                toggleEmailAlerts.checked = prefs.email_alerts.enabled === true;
+                handleToggleChange(toggleEmailAlerts, panelAlerts); // Trigger UI update
+
+                if (prefs.email_alerts.threshold) {
+                    document.getElementById('alert-avg').value = prefs.email_alerts.threshold.kwh_limit_per_day || '';
+                    document.getElementById('alert-days').value = prefs.email_alerts.threshold.rolling_days_window || '';
+                }
+            }
+        }
+    });
+
+    function renderLocalData(data) {
+        resultsList.innerHTML = "";
+
+        data.forEach(entry => {
+            const li = document.createElement('li');
+            li.textContent = `${entry.fechaHora}: ${Math.round(toKwh(entry.consumo))} kWh`;
+            resultsList.appendChild(li);
+        });
+
+        const { total, average, projected } = summarizeConsumption(data);
+
+        document.getElementById('totalConsumption').innerHTML = `<b>${Math.round(total)} </b> kWh`;
+        document.getElementById('averageConsumption').innerHTML = `<b>${Math.round(average)} </b> kWh`;
+        document.getElementById('projectedConsumption').innerHTML = `<b>${Math.round(projected)} </b> kWh`;
+    }
+
+    // textContent only: a line can include a server-provided validation message.
+    function renderStatusLines(lines) {
+        const container = document.getElementById('status-lines');
+        container.replaceChildren(...lines.map((line) => {
+            const element = document.createElement('div');
+            element.className = `email-status ${line.tone}`;
+            element.textContent = line.text;
+            return element;
+        }));
+    }
+
+    function renderContractPicker(contracts, selectedContract) {
+        if (contracts.length < 2) return;
+
+        contracts.forEach((contract) => {
+            const option = document.createElement('option');
+            option.value = String(contract.id);
+            option.textContent = typeof contract.direccion === 'string' ? `${contract.id} - ${contract.direccion}` : String(contract.id);
+            option.selected = contract === selectedContract;
+            contractSelect.appendChild(option);
+        });
+        contractSelect.dataset.savedValue = contractSelect.value;
+        document.getElementById('contract-picker').classList.remove('hidden');
+    }
+
+    function setEmailReportsDaysOfTheWeek() {
+        // add email report Days of the Week
+        let daysOfTheWeekStrings = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
+        let daysGrid = document.getElementsByClassName('days-grid')[0];
+
+        daysOfTheWeekStrings.forEach((day, index) => {
+            const dayOfTheWeekHTML = `<label><input type="checkbox" class="day-cb" value=${index}> ${day}</label>`;
+            daysGrid.insertAdjacentHTML('beforeend', dayOfTheWeekHTML);
+        });
+    }
+
+    function enableLoggedInPanel(loggedIn) {
+        if (loggedIn) {
+            authView.classList.remove('hidden');
+            unauthView.classList.add('hidden');
+            routeLogOff.classList.remove('hidden');
+        } else {
+            unauthView.classList.remove('hidden');
+            authView.classList.add('hidden');
+            routeLogOff.classList.add('hidden');
+        }
+    }
+});

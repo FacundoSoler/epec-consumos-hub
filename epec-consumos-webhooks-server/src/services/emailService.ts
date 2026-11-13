@@ -1,4 +1,8 @@
 import nodemailer from 'nodemailer';
+import { createLogger } from '../logger.js';
+import { maskEmail } from '../maskEmail.js';
+
+const log = createLogger('email');
 
 const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -9,16 +13,13 @@ const transporter = nodemailer.createTransport({
 });
 
 export async function sendEmail(subject: string, htmlContent: string, sendToEmailAddress: string) {
-    try {
-        const info = await transporter.sendMail({
-            from: `"Electricity Monitor" ${process.env.SMTP_USER}`,
-            to: sendToEmailAddress,
-            subject: subject,
-            html: htmlContent
-        });
+    const info = await transporter.sendMail({
+        from: `"Electricity Monitor" <${process.env.SMTP_USER}>`,
+        to: sendToEmailAddress,
+        subject,
+        html: htmlContent
+    });
 
-        console.log('Email sent %s', info.messageId);
-    } catch (error) {
-        console.error('Error sending email', error);
-    }
+    log.info(`Email sent to ${maskEmail(sendToEmailAddress) ?? 'unknown recipient'} (Gmail message id ${info.messageId})`);
+    return info.messageId;
 }

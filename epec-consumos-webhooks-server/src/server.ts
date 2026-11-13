@@ -2,21 +2,22 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 
-import authRoutes from './routes/authRoutes.js';
-import epecApiRoutes from './routes/epecAPIroutes.js';
-import webhooksRoutes from './routes/webhooksRoutes.js';
+import emailRoutes from './routes/emailRoutes.js';
+import healthRoutes from './routes/healthRoutes.js';
+import { getPort } from './config.js';
+import { getLogHashSecret } from './logger.js';
+import { handleListenResult } from './listenResult.js';
+
+getLogHashSecret();
 
 const app = express();
 app.use(cors());
-const PORT = 3000;
+const PORT = getPort();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use('/api/auth', authRoutes);
-app.use('/api/epec', epecApiRoutes);
-app.use('/api/webhooks', webhooksRoutes);
+app.use('/api/health', healthRoutes);
+app.use('/api/email', emailRoutes);
 
-app.listen(PORT, () => {
-    console.log(`🚀 Local Express server running on http://localhost:${PORT}`);
-});
+app.listen(PORT, (error) => handleListenResult(PORT, error));
