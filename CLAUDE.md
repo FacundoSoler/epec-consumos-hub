@@ -10,7 +10,9 @@ Repo root (runs both sub-projects in sequence; exits 1 if either fails):
 - Install everything: `npm run install:all`
 - All tests: `npm test`
 - Typecheck everything: `npm run check`
-- Build the extension (production): `npm run build`
+- Local testing in one command: `npm run dev` (builds the extension in dev mode, then starts the server; load `epec-consumption-reporting-extension/dist` in Chrome)
+- Extension build: `npm run ext:build` (production, Railway) or `npm run ext:build:dev` (localhost)
+- Server: `npm run server:dev` (restarts on change) or `npm run server:start` (like Railway)
 
 Server (`epec-consumos-webhooks-server/`):
 - Dev server: `npm run dev` (http://localhost:3000)

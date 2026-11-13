@@ -23,7 +23,7 @@ flowchart LR
 
 ### Chrome extension (`epec-consumption-reporting-extension/`)
 
-Plain JS ES modules bundled by Vite into `dist/`, which is what Chrome loads (see "Decisions"). `npm run build` targets Railway; `npm run build:dev` targets `http://localhost:3000` and keeps it in `host_permissions`.
+Plain JS ES modules bundled by Vite into `dist/`, which is what Chrome loads (see "Decisions"). `npm run build` targets Railway; `npm run build:dev` targets `http://localhost:3000` and keeps it in `host_permissions`. From the repo root the same builds are `npm run ext:build` and `npm run ext:build:dev`, and `npm run dev` builds the dev extension and starts the local server.
 
 | File | Responsibility |
 |---|---|
