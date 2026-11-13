@@ -13,6 +13,7 @@ Repo root (runs both sub-projects in sequence; exits 1 if either fails):
 - Local testing in one command: `npm run dev` (builds the extension in dev mode, then starts the server; load `epec-consumption-reporting-extension/dist` in Chrome)
 - Extension build: `npm run ext:build` (production, Railway) or `npm run ext:build:dev` (localhost)
 - Server: `npm run server:dev` (restarts on change) or `npm run server:start` (like Railway)
+- CI runs `npm test` and `npm run check` on every pull request and push to `main` via `.github/workflows/ci.yml`.
 
 Server (`epec-consumos-webhooks-server/`):
 - Dev server: `npm run dev` (http://localhost:3000); `GET /api/health` answers `{ "status": "ok" }` with no auth, to check it is up
