@@ -168,12 +168,12 @@ sequenceDiagram
 
 ## Testing
 
-Both projects use Vitest: 94 server tests and 279 extension tests. `npm test` at the repo root runs both suites in sequence (always both, exit code 1 if either fails), or run `npm run test:run` inside one folder.
+Both projects use Vitest: 94 server tests and 320 extension tests. `npm test` at the repo root runs both suites in sequence (always both, exit code 1 if either fails), or run `npm run test:run` inside one folder.
 
 - **Server** tests sit next to the code (`src/**/*.test.ts`). `src/testing/fakeExpress.ts` provides request/response fakes, and nodemailer and the EPEC client are replaced with `vi.mock`, so no network or SMTP is needed.
 - **Extension** tests live in `tests/` and run in Node rather than a browser. Small fakes stand in for what Chrome and the page provide: `chromeMock.js` (storage with both promise and callback styles, `onMessage`, `onStartup`, badge), `epecApiMock.js` (`fetch` routed to canned EPEC responses) and `pageMock.js` (the page `window` and a fake `XMLHttpRequest` whose events tests fire by hand). Content scripts and `background.js` are imported fresh per test with `vi.resetModules()`, because they register listeners at load time.
 - **Time-dependent code** (Córdoba dates, weekdays, the daily limiter) is tested with fake timers at boundaries such as Córdoba midnight versus UTC midnight and New Year's Eve.
-- **Practice:** every fix commit on this branch contains its own tests, and each commit passes on its own. The badge tests were confirmed to fail against the pre-fix code.
+- **Practice:** every fix commit contains its own tests, and each commit passes on its own. The badge tests were confirmed to fail against the pre-fix code.
 
 ## Known limitations and follow-ups
 
