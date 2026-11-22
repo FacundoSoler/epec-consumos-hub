@@ -2,9 +2,22 @@ import { localStorageKeys } from './storage/localStorageKeys.js';
 import { summarizeConsumption, toKwh } from './utils/consumptionMetrics.js';
 import { resolveSelectedContract, store } from './storage/store.js';
 import { showSessionExpiredBadge } from './services/sessionService.js';
-import { validateAlertThreshold } from './services/alertService.js';
 import { buildPopupStatusLines } from './utils/emailStatusText.js';
+import {
+    KWH_LIMIT_OPTIONS,
+    QUICK_DAY_SELECTIONS,
+    ROLLING_DAYS_OPTIONS,
+    WEEKDAY_OPTIONS,
+    buildAlertsSection,
+    buildReportsSection,
+    mergeSectionIntoPreferences,
+    orderDaysMondayFirst,
+    shouldShowNoDaysHint,
+    resolveAlertSelection,
+    toggleDay
+} from './utils/notificationOptions.js';
 
+const SAVE_CONFIRMATION_MS = 2000;
 const EPEC_LOGIN_URL = 'https://www.epec.com.ar/usuario/ingreso?returnTo=%2Foficina-virtual%2Fmis-datos';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -20,24 +33,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const toggleEmailAlerts = document.getElementById('toggle-emailAlerts');
     const panelAlerts = document.getElementById('panel-alerts');
 
-    const blockInvalidChars = (e) => {
-        if (['-', '+', 'e', 'E'].includes(e.key)) {
-            e.preventDefault();
-        }
-    };
-
-    const avgInput = document.getElementById('alert-avg');
-    if (avgInput) avgInput.addEventListener('keydown', blockInvalidChars);
-
-    const daysInput = document.getElementById('alert-days');
-    if (daysInput) {
-        daysInput.addEventListener('keydown', blockInvalidChars);
-        daysInput.addEventListener('keydown', (e) => {
-            if (e.key === '.' || e.key === ',') {
-                e.preventDefault();
-            }
-        });
-    }
+    const avgSelect = document.getElementById('alert-avg');
+    const daysSelect = document.getElementById('alert-days');
+    fillNumberOptions(avgSelect, KWH_LIMIT_OPTIONS);
+    fillNumberOptions(daysSelect, ROLLING_DAYS_OPTIONS);
+    showAlertSelection(resolveAlertSelection(undefined));
 
     const handleToggleChange = (toggleEl, panelEl) => {
         if (toggleEl.checked) {
@@ -47,10 +47,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    toggleEmail.addEventListener('change', () => handleToggleChange(toggleEmail, panelEmail));
-    toggleEmailAlerts.addEventListener('change', () => handleToggleChange(toggleEmailAlerts, panelAlerts));
+    const reportsSaveStatus = document.getElementById('save-status-reports');
+    const alertsSaveStatus = document.getElementById('save-status-alerts');
 
-    setEmailReportsDaysOfTheWeek();
+    toggleEmail.addEventListener('change', () => {
+        handleToggleChange(toggleEmail, panelEmail);
+        refreshNoDaysHint();
+        saveReportsSection();
+    });
+    toggleEmailAlerts.addEventListener('change', () => {
+        handleToggleChange(toggleEmailAlerts, panelAlerts);
+        saveAlertsSection();
+    });
+    avgSelect.addEventListener('change', saveAlertsSection);
+    daysSelect.addEventListener('change', saveAlertsSection);
+
+    let selectedDays = [];
+    let storedPreferences;
+    const dayPills = renderDayPills();
+    const quickDayButtons = renderQuickDaySelections();
+    // Until storage answers, a change would overwrite the stored preferences with the defaults on screen.
+    setNotificationControlsEnabled(false);
 
     const openEpecLogin = () => chrome.tabs.create({ url: EPEC_LOGIN_URL });
     routeBtn.addEventListener('click', openEpecLogin);
@@ -108,47 +125,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    const saveNotificationsBtn = document.getElementById('save-notifications');
-    saveNotificationsBtn.addEventListener('click', () => {
-        const selectedDays = Array.from(document.querySelectorAll('.day-cb:checked')).map(cb => cb.value);
-        const threshold = {
-            kwh_limit_per_day: Number(document.getElementById('alert-avg').value),
-            rolling_days_window: Number(document.getElementById('alert-days').value)
-        };
-        const saveStatus = document.getElementById('save-status');
-
-        const thresholdError = toggleEmailAlerts.checked ? validateAlertThreshold(threshold) : null;
-        if (thresholdError) {
-            saveStatus.textContent = thresholdError;
-            saveStatus.style.color = 'red';
-            setTimeout(() => { saveStatus.textContent = ''; }, 5000);
-            return;
-        }
-
-        const preferences = {
-            email_reports: {
-                enabled: toggleEmail.checked,
-                days: selectedDays
-            },
-            email_alerts: {
-                enabled: toggleEmailAlerts.checked,
-                threshold
-            }
-        };
-
-        chrome.runtime.sendMessage({ action: 'save_notifications', payload: preferences }, (response) => {
-            if (response && response.success) {
-                saveStatus.textContent = '¡Preferencias guardadas exitosamente!';
-                saveStatus.style.color = '#00875a';
-            } else {
-                saveStatus.textContent = `${response?.error}. Error al guardar. Intente nuevamente.`;
-                saveStatus.style.color = 'red';
-                console.error('Save failed:', response?.error);
-            }
-            setTimeout(() => { saveStatus.textContent = ''; }, 5000);
-        });
-    });
-
     chrome.action.setBadgeText({ text: '' });
     const resultsList = document.getElementById('results');
     const status = document.getElementById('status'); // clear the current badge icon if any was set.
@@ -197,32 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }));
     });
 
-    chrome.storage.local.get([localStorageKeys.NOTIFICATION_PREFERENCES], (data) => {
-        if (data.notificationPrefs) {
-            const prefs = data.notificationPrefs;
-
-            if (prefs.email_reports) {
-                toggleEmail.checked = prefs.email_reports.enabled === true;
-                handleToggleChange(toggleEmail, panelEmail); // Trigger UI update
-
-                if (prefs.email_reports.days) {
-                    document.querySelectorAll('.day-cb').forEach(cb => {
-                        cb.checked = prefs.email_reports.days.includes(cb.value);
-                    });
-                }
-            }
-
-            if (prefs.email_alerts) {
-                toggleEmailAlerts.checked = prefs.email_alerts.enabled === true;
-                handleToggleChange(toggleEmailAlerts, panelAlerts); // Trigger UI update
-
-                if (prefs.email_alerts.threshold) {
-                    document.getElementById('alert-avg').value = prefs.email_alerts.threshold.kwh_limit_per_day || '';
-                    document.getElementById('alert-days').value = prefs.email_alerts.threshold.rolling_days_window || '';
-                }
-            }
-        }
-    });
+    loadStoredNotificationPreferences();
 
     function renderLocalData(data) {
         resultsList.innerHTML = "";
@@ -265,15 +216,126 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('contract-picker').classList.remove('hidden');
     }
 
-    function setEmailReportsDaysOfTheWeek() {
-        // add email report Days of the Week
-        let daysOfTheWeekStrings = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
-        let daysGrid = document.getElementsByClassName('days-grid')[0];
-
-        daysOfTheWeekStrings.forEach((day, index) => {
-            const dayOfTheWeekHTML = `<label><input type="checkbox" class="day-cb" value=${index}> ${day}</label>`;
-            daysGrid.insertAdjacentHTML('beforeend', dayOfTheWeekHTML);
+    // Native buttons already toggle on Space/Enter and take focus; aria-pressed carries the state.
+    function renderDayPills() {
+        const pills = WEEKDAY_OPTIONS.map((day) => {
+            const pill = document.createElement('button');
+            pill.type = 'button';
+            pill.className = 'day-pill';
+            pill.textContent = day.label;
+            pill.title = day.name;
+            pill.setAttribute('aria-label', day.name);
+            pill.setAttribute('aria-pressed', 'false');
+            pill.dataset.value = day.value;
+            pill.addEventListener('click', () => selectDaysAndSave(toggleDay(selectedDays, day.value)));
+            return pill;
         });
+        document.getElementById('day-pills').replaceChildren(...pills);
+        return pills;
+    }
+
+    function renderQuickDaySelections() {
+        const buttons = QUICK_DAY_SELECTIONS.map((quick) => {
+            const link = document.createElement('button');
+            link.type = 'button';
+            link.className = 'quick-day';
+            link.textContent = quick.label;
+            link.addEventListener('click', () => selectDaysAndSave([...quick.days]));
+            return link;
+        });
+        document.getElementById('quick-days').replaceChildren(...buttons);
+        return buttons;
+    }
+
+    function showSelectedDays(days) {
+        selectedDays = days;
+        dayPills.forEach((pill) => pill.setAttribute('aria-pressed', String(days.includes(pill.dataset.value))));
+        refreshNoDaysHint();
+    }
+
+    function refreshNoDaysHint() {
+        document.getElementById('no-days-hint').classList.toggle('hidden', !shouldShowNoDaysHint(toggleEmail.checked, selectedDays));
+    }
+
+    function setNotificationControlsEnabled(enabled) {
+        [toggleEmail, toggleEmailAlerts, avgSelect, daysSelect, ...dayPills, ...quickDayButtons]
+            .forEach((control) => { control.disabled = !enabled; });
+    }
+
+    function selectDaysAndSave(days) {
+        showSelectedDays(days);
+        saveReportsSection();
+    }
+
+    function loadStoredNotificationPreferences() {
+        chrome.storage.local.get([localStorageKeys.NOTIFICATION_PREFERENCES], (data) => {
+            storedPreferences = data[localStorageKeys.NOTIFICATION_PREFERENCES];
+            showNotificationPreferences(storedPreferences);
+            setNotificationControlsEnabled(true);
+        });
+    }
+
+    function showNotificationPreferences(prefs) {
+        toggleEmail.checked = prefs?.email_reports?.enabled === true;
+        handleToggleChange(toggleEmail, panelEmail);
+        showSelectedDays(orderDaysMondayFirst(prefs?.email_reports?.days));
+
+        toggleEmailAlerts.checked = prefs?.email_alerts?.enabled === true;
+        handleToggleChange(toggleEmailAlerts, panelAlerts);
+        showAlertSelection(resolveAlertSelection(prefs?.email_alerts?.threshold));
+    }
+
+    function saveReportsSection() {
+        const reports = buildReportsSection({ reportsEnabled: toggleEmail.checked, reportDays: selectedDays });
+        saveSection('email_reports', reports, reportsSaveStatus);
+    }
+
+    function saveAlertsSection() {
+        const alerts = buildAlertsSection({
+            alertsEnabled: toggleEmailAlerts.checked,
+            kwhLimit: avgSelect.value,
+            rollingDays: daysSelect.value
+        });
+        saveSection('email_alerts', alerts, alertsSaveStatus);
+    }
+
+    function saveSection(section, sectionValue, statusElement) {
+        const preferences = mergeSectionIntoPreferences(storedPreferences, section, sectionValue);
+
+        chrome.runtime.sendMessage({ action: 'save_notifications', payload: preferences }, (response) => {
+            if (!chrome.runtime.lastError && response?.success) {
+                storedPreferences = preferences;
+                showSaveStatus(statusElement, 'Guardado ✓', false);
+                return;
+            }
+            console.error('Save failed:', chrome.runtime.lastError?.message ?? response?.error);
+            showSaveStatus(statusElement, 'No se pudo guardar. Intente nuevamente.', true);
+            // The controls already show the rejected choice; going back to storage keeps them truthful.
+            loadStoredNotificationPreferences();
+        });
+    }
+
+    function showSaveStatus(statusElement, text, isError) {
+        clearTimeout(Number(statusElement.dataset.timer));
+        statusElement.textContent = text;
+        statusElement.classList.toggle('error', isError);
+        statusElement.classList.remove('faded');
+        if (isError) return;
+        statusElement.dataset.timer = String(setTimeout(() => statusElement.classList.add('faded'), SAVE_CONFIRMATION_MS));
+    }
+
+    function fillNumberOptions(select, values) {
+        select.replaceChildren(...values.map((value) => {
+            const option = document.createElement('option');
+            option.value = String(value);
+            option.textContent = String(value);
+            return option;
+        }));
+    }
+
+    function showAlertSelection({ kwhLimit, rollingDays }) {
+        avgSelect.value = String(kwhLimit);
+        daysSelect.value = String(rollingDays);
     }
 
     function enableLoggedInPanel(loggedIn) {

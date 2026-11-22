@@ -101,18 +101,59 @@
             padding-bottom: 4px;
         }
 
-        .days-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 6px;
-            font-size: 12px;
+        .day-pills {
+            display: flex;
+            justify-content: center;
+            gap: 4px;
         }
 
-        .days-grid label {
+        button.day-pill {
+            width: 34px;
+            height: 34px;
+            padding: 0;
+            border-radius: 50%;
+            background: #fff;
+            color: #555;
+            border: 1px solid #ccc;
+            font-weight: bold;
+        }
+
+        button.day-pill:hover {
+            background: #f0f0f0;
+        }
+
+        button.day-pill[aria-pressed="true"] {
+            background: #00875a;
+            border-color: #00875a;
+            color: #fff;
+        }
+
+        button.day-pill:focus-visible,
+        button.quick-day:focus-visible {
+            outline: 2px solid #005c3d;
+            outline-offset: 2px;
+        }
+
+        .quick-days {
             display: flex;
-            align-items: center;
-            gap: 4px;
-            cursor: pointer;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 6px;
+        }
+
+        button.quick-day {
+            width: auto;
+            padding: 0;
+            background: none;
+            color: #00875a;
+            font-size: 12px;
+            font-weight: normal;
+            text-decoration: underline;
+        }
+
+        button.quick-day:hover {
+            background: none;
+            color: #006644;
         }
 
         .input-group {
@@ -123,8 +164,8 @@
             font-size: 12px;
         }
 
-        .input-group input {
-            width: 60px;
+        .input-group select {
+            width: 70px;
             padding: 4px;
             border: 1px solid #ccc;
             border-radius: 4px;
@@ -210,6 +251,36 @@
             color: #777;
         }
 
+        .day-pills-label {
+            font-size: 12px;
+            color: #555;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        .no-days-hint {
+            font-size: 11px;
+            color: #777;
+            margin-top: 6px;
+            text-align: center;
+        }
+
+        .save-status {
+            font-size: 11px;
+            min-height: 14px;
+            margin-bottom: 4px;
+            color: #00875a;
+            transition: opacity 0.4s ease;
+        }
+
+        .save-status.error {
+            color: #d9534f;
+        }
+
+        .save-status.faded {
+            opacity: 0;
+        }
+
         /* Panel transition */
         .settings-panel {
             transition: opacity 0.2s ease;
@@ -279,32 +350,36 @@
             <div class="toggle-header">
                 <div class="section-title">Reportes Diarios (Email)</div>
                 <label class="switch">
-                    <input type="checkbox" id="toggle-email">
+                    <input type="checkbox" id="toggle-email" aria-label="Reportes diarios por email">
                     <span class="slider"></span>
                 </label>
             </div>
+            <div id="save-status-reports" class="save-status" role="status" aria-live="polite"></div>
 
             <div id="panel-email" class="settings-panel hidden">
-                <div class="days-grid">
-                </div>
+                <div id="day-pills-label" class="day-pills-label">Elegí los días en que querés recibir el reporte:</div>
+                <div class="day-pills" id="day-pills" role="group" aria-labelledby="day-pills-label"></div>
+                <div class="quick-days" id="quick-days"></div>
+                <div id="no-days-hint" class="no-days-hint hidden">Elegí al menos un día para recibir el reporte.</div>
             </div>
 
             <div class="toggle-header" style="margin-top: 15px;">
                 <div class="section-title">Alertas de Exceso (Email)</div>
                 <label class="switch">
-                    <input type="checkbox" id="toggle-emailAlerts">
+                    <input type="checkbox" id="toggle-emailAlerts" aria-label="Alertas de exceso por email">
                     <span class="slider"></span>
                 </label>
             </div>
+            <div id="save-status-alerts" class="save-status" role="status" aria-live="polite"></div>
 
             <div id="panel-alerts" class="settings-panel hidden">
                 <div class="input-group">
-                    <label for="alert-avg">Consumo promedio por Día (kWh):</label>
-                    <input type="number" id="alert-avg" min="0.1" step="0.1" placeholder="Ej: 20.5">
+                    <label for="alert-avg">Consumo promedio por día (kWh):</label>
+                    <select id="alert-avg"></select>
                 </div>
                 <div class="input-group">
-                    <label for="alert-days">Cantidad de Días a Evaluar:</label>
-                    <input type="number" id="alert-days" min="1" max="31" step="1" placeholder="Ej: 3">
+                    <label for="alert-days">Cantidad de días a evaluar:</label>
+                    <select id="alert-days"></select>
                 </div>
                 <p style="font-size: 10px; color: #777; margin-top: 0; line-height: 1.2;">
                     Ej: Si el límite es 20 kWh y evaluás 3 días, recibirás un email (como máximo uno por día) cuando el
@@ -313,9 +388,6 @@
                 </p>
             </div>
 
-            <button id="save-notifications" style="margin-top: 15px;">Guardar Cambios</button>
-            <div id="save-status"
-                style="font-size: 12px; color: #00875a; margin-top: 5px; text-align: center; min-height: 14px;"></div>
         </div>
 
     </div>

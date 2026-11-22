@@ -37,9 +37,10 @@ Plain JS ES modules bundled by Vite into `dist/`, which is what Chrome loads (se
 | `src/services/emailApi.js` | Shared email POST: 15 s timeout, classifies the answer into an outcome. |
 | `src/utils/maskEmail.js`, `src/utils/emailStatusText.js` | Masked recipient (`fa*****@domain`) and the popup's Spanish email-status lines. |
 | `src/storage/*` | Storage keys and getters (`getEpecUser`, `getBearerToken`, `getContractId` for the selected contract, `isSessionExpired`) and `resolveSelectedContract`. |
+| `src/utils/notificationOptions.js` | Notifications tab choices: dropdown options, nearest-option snapping for stored values, weekday pills and quick selections, section builders and the merge that keeps the untouched section as stored. |
 | `src/utils/consumptionMetrics.js` | `toKwh()` (numbers or `"12,4"` strings) and `summarizeConsumption()` (total, average, 28-day projection), shared by the popup and the email report. |
 | `src/utils/logger.js`, `src/utils/html.js`, `src/utils/utils.js` | Structured JSON logger, HTML escaping for email bodies, Córdoba date helpers. |
-| `src/popup.*` | Reports tab (total, daily average, 28-day projection, daily list, last report/alert email status), contract picker when the user has several contracts, session-expired banner, and Notifications tab (report weekdays, alert limit and window). |
+| `src/popup.*` | Reports tab (total, daily average, 28-day projection, daily list, last report/alert email status), contract picker when the user has several contracts, session-expired banner, and Notifications tab, which saves each change immediately, rewriting only the section that changed (report weekdays as Monday-first pills with Todos/Hábiles/Ninguno, alert limit 5–50 kWh and window 1–31 days as dropdowns; a per-section "Guardado ✓" or red error). |
 
 Storage keys: `epecUser`, `consumptionData`, `lastUpdated`, `notificationPrefs`, `lastReportSentOn`, `lastAlertSentOn`, `sessionExpired`, `selectedContractId`, `lastEmailStatus` (`{ report, alert }`, the latest outcome of each email, shown in the popup), `lastRefreshError` (`no-data`, `epec-error` or `session-expired` after a failed refresh, which also clears `lastEmailStatus` so the popup shows one red line instead of email lines; null after a successful refresh).
 
@@ -167,12 +168,12 @@ sequenceDiagram
 
 ## Testing
 
-Both projects use Vitest: 94 server tests and 279 extension tests. `npm test` at the repo root runs both suites in sequence (always both, exit code 1 if either fails), or run `npm run test:run` inside one folder.
+Both projects use Vitest: 94 server tests and 320 extension tests. `npm test` at the repo root runs both suites in sequence (always both, exit code 1 if either fails), or run `npm run test:run` inside one folder.
 
 - **Server** tests sit next to the code (`src/**/*.test.ts`). `src/testing/fakeExpress.ts` provides request/response fakes, and nodemailer and the EPEC client are replaced with `vi.mock`, so no network or SMTP is needed.
 - **Extension** tests live in `tests/` and run in Node rather than a browser. Small fakes stand in for what Chrome and the page provide: `chromeMock.js` (storage with both promise and callback styles, `onMessage`, `onStartup`, badge), `epecApiMock.js` (`fetch` routed to canned EPEC responses) and `pageMock.js` (the page `window` and a fake `XMLHttpRequest` whose events tests fire by hand). Content scripts and `background.js` are imported fresh per test with `vi.resetModules()`, because they register listeners at load time.
 - **Time-dependent code** (Córdoba dates, weekdays, the daily limiter) is tested with fake timers at boundaries such as Córdoba midnight versus UTC midnight and New Year's Eve.
-- **Practice:** every fix commit on this branch contains its own tests, and each commit passes on its own. The badge tests were confirmed to fail against the pre-fix code.
+- **Practice:** every fix commit contains its own tests, and each commit passes on its own. The badge tests were confirmed to fail against the pre-fix code.
 
 ## Known limitations and follow-ups
 
